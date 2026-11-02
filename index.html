@@ -107,7 +107,7 @@ body.film .top .note,body.film .bar,body.film .sheet,body.film .welcome{display:
     <button class="btn primary" type="submit">הוספה</button>
   </form>
   <div class="row"><input id="searchInput" placeholder="חיפוש בית לפי שם" aria-label="חיפוש תושב"></div>
-  <button class="btn primary" id="saveSite" type="button" hidden>שמירת האתר (הורדת קובץ)</button>
+  <button class="btn primary" id="saveSite" type="button" hidden>בדיקת שמירה בענן</button>
   <div class="msg" id="msg"></div>
   <div class="list" id="list"></div>
 </div>
@@ -523,20 +523,20 @@ $('addForm').addEventListener('submit',async e=>{
   $('msg').textContent='';
   if(residents.length>=CAP){$('msg').textContent='כל '+CAP+' הבתים בעיר תפוסים.';return}
   inp.value='';
-  if(localMode){residents=[...residents,{id:'l'+Date.now(),name,at:Date.now()}];onResidents(residents,true);return}
+  if(localMode){await cloudWrite('POST',{name});return}
   try{await col.add({name,at:Date.now()})}catch(err){$('msg').textContent='ההוספה לא נשמרה. נסי שוב בעוד רגע.';inp.value=name}
 });
 let moving=false;
 async function moveResident(i,d){
   if(moving)return;const a=residents[i],b=residents[i+d];if(!a||!b)return;
   let ta=b.at,tb=a.at;if(ta===tb){ta=tb+d}
-  if(localMode){a.at=ta;b.at=tb;residents=[...residents].sort((x,y)=>x.at-y.at);render();return}
+  if(localMode){await cloudWrite('PATCH',{action:'move',a:a.id,b:b.id});return}
   moving=true;$('msg').textContent='';
   try{await col.doc(a.id).update({at:ta});await col.doc(b.id).update({at:tb})}catch(err){$('msg').textContent='ההזזה לא הצליחה.'}
   finally{moving=false}
 }
 async function removeResident(r){
-  if(localMode){residents=residents.filter(x=>x.id!==r.id);onResidents(residents,false);return}
+  if(localMode){await cloudWrite('PATCH',{action:'delete',id:r.id});return}
   try{await col.doc(r.id).delete()}catch(err){$('msg').textContent='המחיקה לא הצליחה.'}
 }
 
@@ -550,7 +550,7 @@ $('welcomeForm').addEventListener('submit',async e=>{
   if(name===VIP&&!canAdmin){$('welcomeMsg').textContent='השם הזה שמור למנהל העיר.';return}
   if(residents.length>=CAP){$('welcomeMsg').textContent='כל הבתים בעיר תפוסים כרגע.';return}
   const btn=$('welcomeBtn');btn.disabled=true;$('welcomeMsg').textContent='';
-  if(localMode){myId='me-local';residents=[...residents,{id:myId,name,at:Date.now()}];welcome.hidden=true;onResidents(residents,true);return}
+  if(localMode){const ok=await cloudWrite('POST',{name});if(ok){welcome.hidden=true;try{sessionStorage.setItem('sc_skip','1')}catch(e){}}else{$('welcomeMsg').textContent='לא הצלחנו לשמור את הבית בענן.'}btn.disabled=false;return}
   try{await col.doc(myId).set({name,at:Date.now()});welcome.hidden=true}
   catch(err){$('welcomeMsg').textContent='לא הצלחנו לשמור את הבית. נסו שוב בעוד רגע.'}
   finally{btn.disabled=false}
@@ -589,7 +589,8 @@ function syncAdminUI(){
 }
 async function saveSettings(patch){
   const next={...settings,...patch};
-  if(localMode||!settingsRef){applySettings(next);return}
+  if(localMode){await cloudWrite('PATCH',{action:'settings',...next});return}
+  if(!settingsRef){applySettings(next);return}
   if(savingSettings)return;savingSettings=true;$('msg').textContent='';
   try{await settingsRef.set({party:next.party,title:next.title,theme:next.theme,updatedAt:Date.now()})}catch(err){$('msg').textContent='השינוי לא נשמר.'}
   finally{savingSettings=false}
@@ -625,17 +626,17 @@ function goStatic(){
   residents=STATIC_RESIDENTS.map((name,i)=>({id:'s'+i,name,at:i}));knownIds=new Set(residents.map(r=>r.id));
   applySettings({party:!!STATIC_SETTINGS.party,title:STATIC_SETTINGS.title||'',theme:THEMES[STATIC_SETTINGS.theme]?STATIC_SETTINGS.theme:'day'});
   $('openList').textContent=admin?'ניהול':'תושבים';
-  setNote(admin?'מצב עריכה: אחרי שינויים לוחצים "שמירת האתר" ומעלים את הקובץ החדש':'');
+  setNote('מתחבר לשמירה בענן...');
   $('saveSite').hidden=!admin;$('addRes').hidden=!admin;
   render()}
 function enterAdmin(){try{sessionStorage.setItem('sc_admin','1')}catch(e){}canAdmin=true;$('openList').textContent='ניהול';$('saveSite').hidden=false;$('addRes').hidden=false;
-  setNote('מצב עריכה: אחרי שינויים לוחצים "שמירת האתר" ומעלים את הקובץ החדש');render();toast('ברוך הבא, ראש העיר!','עכשיו אפשר להוסיף תושבים ולעשות מסיבות')}
+  setNote('השינויים נשמרים אוטומטית בענן');render();toast('ברוך הבא, ראש העיר!','עכשיו אפשר להוסיף תושבים ולעשות מסיבות')}
 let bannerTaps=[];
 $('cityBanner').addEventListener('click',()=>{if(canAdmin)return;const now=Date.now();bannerTaps=bannerTaps.filter(t=>now-t<3000);bannerTaps.push(now);if(bannerTaps.length>=5){bannerTaps=[];$('adminGate').hidden=false;$('gateMsg').textContent='';$('gateCode').value='';setTimeout(()=>$('gateCode').focus(),60)}});
 $('gateCancel').onclick=()=>{$('adminGate').hidden=true};
 $('gateForm').addEventListener('submit',e=>{e.preventDefault();if(cleanName($('gateCode').value)===VIP){$('adminGate').hidden=true;enterAdmin()}else{$('gateMsg').textContent='הקוד לא נכון.'}});
 $('addRes').onclick=()=>{openSheet();setTimeout(()=>{$('nameInput').focus();$('nameInput').scrollIntoView({block:'center'})},60)};
-async function saveSite(){
+async function saveSite(){await cloudRefresh();$('msg').textContent='האתר מתעדכן ונשמר בענן אוטומטית. לא צריך להוריד קובץ.';return;
   const MR='/*'+'RES*/',MS='/*'+'SET*/';
   const msg=$('msg');msg.textContent='';msg.style.color='';
   if(window.claude){msg.textContent='התושבים נוספו בתצוגה. שמירה לכל המבקרים עובדת באתר שמפורסם באינטרנט (Vercel או Netlify).';return}
@@ -647,7 +648,46 @@ async function saveSite(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([src],{type:'text/html'}));a.download='index.html';document.body.appendChild(a);a.click();a.remove();
   msg.style.color='#3f8f3a';msg.textContent='הקובץ ירד. עכשיו מעלים אותו ל-Netlify במקום הישן.';
 }
-async function connect(){goStatic();return;
+
+let cloudBusy=false,cloudKey='';
+async function cloudCall(method='GET',body){
+ const headers={'Content-Type':'application/json'};
+ if(method==='PATCH'){
+  if(!cloudKey)cloudKey=prompt('הכנס קוד ניהול ענן (הקוד שהגדרת ב-Vercel):')||'';
+  if(!cloudKey)throw new Error('לא הוזן קוד ניהול');
+  headers['x-city-admin']=cloudKey;
+ }
+ const response=await fetch('/api/city',{method,headers,body:body?JSON.stringify(body):undefined,cache:'no-store'});
+ if(!response.ok){if(response.status===403)cloudKey='';throw new Error('שמירה בענן נכשלה ('+response.status+')')}
+ return response.json();
+}
+async function cloudRefresh(){
+ if(cloudBusy)return;
+ try{
+  const data=await cloudCall();
+  if(!Array.isArray(data.residents))throw new Error('missing residents');
+  const list=data.residents.map((r,i)=>({id:String(r.id||i),name:cleanName(r.name),at:Number(r.at)||i})).sort((a,b)=>a.at-b.at);
+  const had=initialLoaded;
+  initialLoaded=true;
+  onResidents(list,had);
+  const v=data.settings||{};
+  applySettings({party:!!v.party,title:String(v.title||''),theme:THEMES[v.theme]?v.theme:'day'});
+  setNote('');
+ }catch(err){setNote('אין חיבור לשמירה בענן. שינויים חדשים לא יישמרו.')}
+}
+async function cloudWrite(method,body){
+ cloudBusy=true;
+ try{const data=await cloudCall(method,body);await cloudRefreshAfter(data);return true}
+ catch(err){$('msg').textContent=err.message;return false}
+ finally{cloudBusy=false}
+}
+async function cloudRefreshAfter(data){
+ const list=(data.residents||[]).map(r=>({id:r.id,name:cleanName(r.name),at:r.at})).sort((a,b)=>a.at-b.at);
+ onResidents(list,true);
+ if(data.settings)applySettings({party:!!data.settings.party,title:data.settings.title||'',theme:THEMES[data.settings.theme]?data.settings.theme:'day'});
+}
+
+async function connect(){goStatic();await cloudRefresh();setInterval(cloudRefresh,8000);return;
   if(!window.claude||!window.claude.use){goLocal();return}
   db=await window.claude.use('db');
   if(!db){goGuest();return}
