@@ -6,6 +6,7 @@ on:
       - '.github/workflows/extract-site.yml'
       - 'shakshuka-city-site.zip'
       - 'shakshuka-city-merged-update.zip'
+      - 'shakshuka-city-site 2.zip'
   workflow_dispatch:
 permissions:
   contents: write
@@ -18,7 +19,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import zipfile, pathlib
-          with zipfile.ZipFile('shakshuka-city-merged-update.zip' if pathlib.Path('shakshuka-city-merged-update.zip').exists() else 'shakshuka-city-site.zip') as z:
+          with zipfile.ZipFile(next((f for f in ['shakshuka-city-merged-update.zip','shakshuka-city-site 2.zip','shakshuka-city-site.zip'] if pathlib.Path(f).exists()))) as z:
               for item in z.infolist():
                   p=pathlib.PurePosixPath(item.filename)
                   if item.is_dir():
