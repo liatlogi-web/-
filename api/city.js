@@ -2,7 +2,7 @@ import { put, get } from '@vercel/blob';
 const KEY='city-state.json';
 const INITIAL={residents:[{id:'s0',name:'אדם גלעד 2',at:0}],settings:{party:false,title:'',theme:'day'}};
 async function load(){
- try {const file=await get(KEY,{access:'private'});if(!file)return structuredClone(INITIAL);return await file.json()} catch(e){if(e?.status===404||e?.code==='blob_not_found')return structuredClone(INITIAL);throw e}
+ try {const file=await get(KEY,{access:'private'});if(!file)return structuredClone(INITIAL);return await new Response(file.stream).json()} catch(e){if(e?.status===404||e?.code==='blob_not_found')return structuredClone(INITIAL);throw e}
 }
 async function store(v){await put(KEY,JSON.stringify(v),{access:'private',addRandomSuffix:false,allowOverwrite:true,contentType:'application/json',cacheControlMaxAge:0})}
 const clean=s=>String(s||'').replace(/\\s+/g,' ').trim().slice(0,30);
@@ -11,7 +11,7 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  if(req.method==='GET'){try{return res.status(200).json(await load())}catch(e){console.error(e);return res.status(500).json({error:'storage unavailable'})}}
  if(!['POST','PATCH','DELETE'].includes(req.method))return res.status(405).end();
- const admin=req.headers['x-city-admin']===process.env.CITY_ADMIN_KEY;
+ const admin=!!process.env.CITY_ADMIN_KEY && req.headers['x-city-admin']===process.env.CITY_ADMIN_KEY;
  if(req.method!=='POST'&&!admin)return res.status(403).json({error:'admin required'});
  try{
   let state=await load();let body=req.body||{};if(typeof body==='string')body=JSON.parse(body);
