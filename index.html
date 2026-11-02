@@ -542,7 +542,7 @@ async function removeResident(r){
 
 // Welcome: ask the visitor's full name and build their house
 const welcome=$('welcome');
-function showWelcome(){welcome.hidden=false;setTimeout(()=>$('fullName').focus(),80)}
+function showWelcome(){return;welcome.hidden=false;setTimeout(()=>$('fullName').focus(),80)}
 $('skipWelcome').onclick=()=>{welcome.hidden=true;try{sessionStorage.setItem('sc_skip','1')}catch(e){}};
 $('welcomeForm').addEventListener('submit',async e=>{
   e.preventDefault();const name=cleanName($('fullName').value);
@@ -556,6 +556,7 @@ $('welcomeForm').addEventListener('submit',async e=>{
   finally{btn.disabled=false}
 });
 function maybeWelcome(){
+  return; // Only the city administrator adds houses.
   if(!initialLoaded)return;
   let skipped=false;try{skipped=sessionStorage.getItem('sc_skip')==='1'}catch(e){}
   if(!skipped&&!residents.some(r=>r.id===myId)&&welcome.hidden)showWelcome();
