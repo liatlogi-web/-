@@ -555,8 +555,7 @@ $('welcomeForm').addEventListener('submit',async e=>{
   catch(err){$('welcomeMsg').textContent='לא הצלחנו לשמור את הבית. נסו שוב בעוד רגע.'}
   finally{btn.disabled=false}
 });
-function maybeWelcome(){
-  return; // Only the city administrator adds houses.
+function maybeWelcome(){return;
   if(!initialLoaded)return;
   let skipped=false;try{skipped=sessionStorage.getItem('sc_skip')==='1'}catch(e){}
   if(!skipped&&!residents.some(r=>r.id===myId)&&welcome.hidden)showWelcome();
