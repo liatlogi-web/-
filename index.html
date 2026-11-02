@@ -673,6 +673,7 @@ async function cloudRefresh(){
   const v=data.settings||{};
   applySettings({party:!!v.party,title:String(v.title||''),theme:THEMES[v.theme]?v.theme:'day'});
   setNote('');
+  if(!residents.some(r=>r.id===myId)) maybeWelcome();
  }catch(err){setNote('אין חיבור לשמירה בענן. שינויים חדשים לא יישמרו.')}
 }
 async function cloudWrite(method,body){
