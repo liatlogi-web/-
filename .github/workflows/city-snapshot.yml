@@ -1,0 +1,27 @@
+name: City snapshot (read-only)
+# Copies the public city data from the live site into data/city-state.json on this branch,
+# so Claude can see the current residents. It only reads the site and never changes it.
+on:
+  push:
+    branches: [city-data]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: city-data
+      - name: Read the live city
+        run: |
+          mkdir -p data
+          curl -fsS https://shakshuka-city.vercel.app/api/city -o data/city-state.json
+          date -u +%Y-%m-%dT%H:%M:%SZ > data/fetched-at.txt
+      - name: Save snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if ! git diff --cached --quiet; then git commit -m "City snapshot" && git push origin HEAD:city-data; fi
