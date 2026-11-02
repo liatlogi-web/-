@@ -1,0 +1,26 @@
+name: Enable automatic city saving
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/enable-cloud.py
+      - .github/workflows/enable-cloud.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch city frontend
+        run: python3 scripts/enable-cloud.py
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Connect city UI to persistent cloud storage"
+            git push
+          fi
