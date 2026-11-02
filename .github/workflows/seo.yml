@@ -1,0 +1,21 @@
+name: Improve Google discoverability
+on:
+  push:
+    paths:
+      - scripts/seo.py
+      - .github/workflows/seo.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/seo.py
+      - name: Commit search metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then git commit -m "Improve Shakshuka City search listing" && git push; fi
