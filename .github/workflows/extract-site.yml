@@ -29,6 +29,18 @@ jobs:
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   dest.write_bytes(z.read(item))
           PY
+      - name: Reconnect cloud saving and disable visitor house creation
+        run: |
+          python3 scripts/enable-cloud.py
+          python3 scripts/fix-welcome.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          s=s.replace('function maybeWelcome(){','function maybeWelcome(){return;')
+          s=s.replace('function showWelcome(){','function showWelcome(){return;')
+          p.write_text(s)
+          PY
       - name: Commit extracted site
         run: |
           git config user.name "github-actions[bot]"
