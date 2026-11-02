@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>שקשוקה סיטי</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: full-screen 3D city; chunky counter cards top, action bar bottom, a bottom sheet for residents */
+:root{
+  --sky:#a9d9f2; --cream:#fff6e2; --ink:#2a1d17; --tomato:#d63b22; --yolk:#ffb51f; --parsley:#3f8f3a; --muted:#7a6a5c;
+  --display:"Rubik","Assistant",system-ui,sans-serif;
+  --body:"Assistant","Rubik",system-ui,sans-serif;
+}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(--ink);font-family:var(--body);direction:rtl;-webkit-user-select:none;user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.top{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:0;right:0;display:grid;justify-items:center;gap:8px;pointer-events:none;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#cityBanner{pointer-events:auto;cursor:default;-webkit-tap-highlight-color:transparent}
+.banner{font-family:var(--display);font-weight:800;font-size:22px;background:var(--tomato);color:var(--cream);padding:6px 18px;border-radius:12px;border:3px solid var(--ink);box-shadow:0 4px 0 var(--ink)}
+.stats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.stat{display:flex;align-items:center;gap:8px;background:var(--cream);border:3px solid var(--ink);border-radius:14px;box-shadow:0 4px 0 var(--ink);padding:4px 12px 4px 8px}
+.stat b{font-family:var(--display);font-weight:800;font-size:24px;color:var(--parsley);font-variant-numeric:tabular-nums}
+.stat span{font-family:var(--display);font-weight:700;font-size:17px}
+.dot{width:26px;height:26px;border-radius:50%;background:var(--parsley);display:grid;place-items:center}
+.dot i{display:block;width:12px;height:12px;border-radius:50%;background:var(--yolk);box-shadow:0 0 0 4px #fff}
+.dot.pan i{width:14px;height:10px;border-radius:3px;background:var(--tomato);box-shadow:0 0 0 3px #222}
+.note{font-size:13px;background:rgba(255,246,226,.92);border-radius:8px;padding:3px 10px;color:var(--muted)}
+.bar{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);left:0;right:0;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.btn{font-family:var(--display);font-weight:700;font-size:16px;padding:10px 16px;border-radius:999px;border:3px solid var(--ink);background:var(--cream);color:var(--ink);box-shadow:0 3px 0 var(--ink);cursor:pointer}
+.btn.primary{background:var(--yolk)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.btn:focus-visible,input:focus-visible{outline:3px solid var(--tomato);outline-offset:2px}
+.party{font-family:var(--display);font-weight:800;font-size:18px;background:linear-gradient(90deg,#ff5fa2,#ffb51f,#5fd3ff);color:var(--ink);padding:5px 16px;border-radius:999px;border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink);animation:bob 1s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-3px) rotate(-1deg)}}
+.admin{display:grid;gap:10px;padding:10px;border:2px dashed #d8c39a;border-radius:14px;background:#fffaf0}
+.admin .sec{display:grid;gap:6px;min-width:0}
+#partyForm input{width:0}
+#partyForm .btn{flex:none;padding:10px 14px}
+.admin .sec>b{font-family:var(--display);font-size:15px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{font-family:var(--body);font-weight:700;font-size:15px;padding:7px 14px;border-radius:999px;border:2px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--cream)}
+.item button.mv{font-weight:700;color:var(--ink);padding:4px 8px}
+.party[hidden],#adminBox[hidden],.sheet[hidden],.note[hidden],.filmhint[hidden],.welcome[hidden],#adminGate[hidden],.btn[hidden],form[hidden]{display:none!important}
+.welcome{position:fixed;inset:0;display:grid;place-items:center;background:rgba(42,29,23,.35);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wcard{width:100%;max-width:360px;display:grid;gap:12px;justify-items:center;text-align:center;background:var(--cream);border:3px solid var(--ink);box-shadow:0 6px 0 var(--ink);border-radius:22px;padding:22px 20px}
+.wcard h1{margin:0;font-family:var(--display);font-weight:800;font-size:26px;line-height:1.15;text-wrap:balance}
+.wcard p{margin:0;font-size:17px;color:var(--muted);line-height:1.45}
+.wcard input{width:100%;box-sizing:border-box;font-family:var(--body);font-size:18px;padding:12px 14px;border-radius:14px;border:2px solid var(--ink);background:#fff;color:var(--ink);text-align:center}
+.wcard .btn{width:100%;font-size:19px}
+.wcard .btn:disabled{opacity:.6}
+.linkbtn{border:0;background:none;color:var(--muted);font-family:var(--body);font-size:15px;text-decoration:underline;cursor:pointer;padding:4px}
+.wegg{width:70px;height:54px;border-radius:50% 50% 46% 54%/60% 60% 40% 40%;background:#fffdf6;border:3px solid var(--ink);display:grid;place-items:center}
+.wegg i{width:28px;height:28px;border-radius:50%;background:var(--yolk);border:3px solid var(--ink)}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:62%;display:flex;flex-direction:column;background:var(--cream);border-top:3px solid var(--ink);border-radius:20px 20px 0 0;padding-block:14px calc(env(safe-area-inset-bottom,0px) + 14px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));gap:10px;box-shadow:0 -8px 30px rgba(0,0,0,.18)}
+.sheet h2{margin:0;font-family:var(--display);font-weight:800;font-size:20px}
+.row{display:flex;gap:8px}
+.row input{flex:1;min-width:0;font-family:var(--body);font-size:17px;padding:10px 12px;border-radius:12px;border:2px solid var(--ink);background:#fff;color:var(--ink)}
+.list{overflow-y:auto;display:grid;gap:6px;min-height:0}
+.item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border:2px solid #e6d8bd;border-radius:12px}
+.item .n{flex:1;min-width:0;font-weight:700;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .num{font-family:var(--display);color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.item button{font-family:var(--body);font-size:14px;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:8px}
+.item button.go{color:var(--parsley);font-weight:700}
+.item button.del.armed{background:var(--tomato);color:#fff}
+.empty{color:var(--muted);font-size:15px;line-height:1.5;padding:6px 2px}
+.msg{font-size:14px;color:var(--tomato);min-height:1em}
+.toast{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%) scale(.85);background:var(--cream);border:3px solid var(--ink);box-shadow:0 5px 0 var(--ink);border-radius:16px;padding:10px 18px;font-family:var(--display);font-weight:800;font-size:22px;text-align:center;opacity:0;transition:opacity .3s,transform .3s cubic-bezier(.3,1.6,.5,1);pointer-events:none;max-width:86vw}
+.toast small{display:block;font-family:var(--body);font-weight:600;font-size:15px;color:var(--muted)}
+.toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+body.film .top .note,body.film .bar,body.film .sheet,body.film .welcome{display:none!important}
+.filmhint{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:50%;transform:translateX(-50%);font-size:13px;color:rgba(42,29,23,.55)}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+
+</head><body>
+<canvas id="c" aria-label="עיר תלת-ממדית של בתי שקשוקה"></canvas>
+
+<div class="top">
+  <div class="banner" id="cityBanner">שקשוקה סיטי</div>
+  <div class="stats">
+    <div class="stat"><div class="dot pan"><i></i></div><b id="nHouses">0</b><span>בתים</span></div>
+    <div class="stat"><div class="dot"><i></i></div><b id="nEggs">0</b><span>ביצים</span></div>
+  </div>
+  <div class="party" id="partyBanner" hidden></div>
+  <div class="note" id="note" hidden></div>
+</div>
+
+<div class="bar" id="bar">
+  <button class="btn primary" id="addRes" type="button" hidden>הוסף תושב</button>
+  <button class="btn primary" id="myHouse" type="button" hidden>הבית שלי</button>
+  <button class="btn" id="openList" type="button">תושבים</button>
+  <button class="btn" id="film" type="button">מצב צילום</button>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="row" style="align-items:center;justify-content:space-between">
+    <h2 id="sheetTitle">תושבי העיר</h2>
+    <button class="btn" id="closeSheet" type="button" style="padding:6px 14px;font-size:14px">סגירה</button>
+  </div>
+  <div class="admin" id="adminBox" hidden>
+    <div class="sec"><b>מסיבה בעיר</b>
+      <form class="row" id="partyForm" autocomplete="off"><input id="partyTitle" maxlength="40" placeholder="שם המסיבה" aria-label="שם המסיבה"><button class="btn primary" id="partyBtn" type="submit">מתחילים!</button></form>
+    </div>
+    <div class="sec"><b>אווירה בעיר</b><div class="chips" id="themeChips"><button type="button" data-theme="day">יום</button><button type="button" data-theme="sunset">שקיעה</button><button type="button" data-theme="night">לילה</button></div></div>
+  </div>
+  <form class="row" id="addForm" autocomplete="off">
+    <input id="nameInput" maxlength="30" placeholder="שם או @שם משתמש" aria-label="שם התושב החדש">
+    <button class="btn primary" type="submit">הוספה</button>
+  </form>
+  <div class="row"><input id="searchInput" placeholder="חיפוש בית לפי שם" aria-label="חיפוש תושב"></div>
+  <button class="btn primary" id="saveSite" type="button" hidden>שמירת האתר (הורדת קובץ)</button>
+  <div class="msg" id="msg"></div>
+  <div class="list" id="list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="welcome" id="adminGate" hidden>
+  <form class="wcard" id="gateForm" autocomplete="off">
+    <h1>כניסת מנהל</h1>
+    <p>כתבו את קוד המנהל</p>
+    <input id="gateCode" maxlength="30" aria-label="קוד מנהל">
+    <div class="msg" id="gateMsg"></div>
+    <button class="btn primary" type="submit">כניסה</button>
+    <button class="linkbtn" id="gateCancel" type="button">ביטול</button>
+  </form>
+</div>
+<div class="welcome" id="welcome" hidden>
+  <form class="wcard" id="welcomeForm" autocomplete="off">
+    <div class="wegg" aria-hidden="true"><i></i></div>
+    <h1>ברוכים הבאים לשקשוקה סיטי</h1>
+    <p>כל תושב מקבל בית משלו בעיר. מה השם המלא שלך?</p>
+    <input id="fullName" maxlength="30" placeholder="שם פרטי ושם משפחה" aria-label="שם מלא">
+    <div class="msg" id="welcomeMsg"></div>
+    <button class="btn primary" id="welcomeBtn" type="submit">בנו לי בית</button>
+    <button class="linkbtn" id="skipWelcome" type="button">רק להסתכל</button>
+  </form>
+</div>
+<div class="filmhint" id="filmhint" hidden>לחיצה על המסך יוצאת ממצב צילום</div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(function(){
+const P=18, BLOCK=14, G=5, RIVER_Z=(G+1)*P, RIVER_W=16;
+const $=id=>document.getElementById(id);
+
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function rng(seed){let a=seed||1;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(42);
+
+// Renderer & scene
+const canvas=$('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xa9d9f2);
+scene.fog=new THREE.Fog(0xa9d9f2,160,330);
+const camera=new THREE.PerspectiveCamera(45,1,2,800);
+const hemi=new THREE.HemisphereLight(0xffffff,0x9a8a6a,0.6);scene.add(hemi);let partyOn=false;
+const sun=new THREE.DirectionalLight(0xfff1d6,0.8);
+sun.position.set(60,110,40);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-0.0008;sun.shadow.normalBias=0.35;
+Object.assign(sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:10,far:300});
+scene.add(sun);
+
+const M=c=>new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.85});
+function canvasTex(w,h,draw){const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');draw(x,w,h);const t=new THREE.CanvasTexture(cv);t.anisotropy=4;return t}
+function roundRect(x,a,b,w,h,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath()}
+function sign(title,sub,w,h){
+  const tex=canvasTex(512,256,(x,W,H)=>{x.fillStyle='#fff6e2';roundRect(x,6,6,W-12,H-12,26);x.fill();x.lineWidth=10;x.strokeStyle='#2a1d17';x.stroke();x.direction='rtl';x.textAlign='center';x.fillStyle='#2a1d17';x.font='800 76px Rubik, Assistant, sans-serif';x.fillText(title,W/2,sub?120:150);if(sub){x.font='600 40px Assistant, Rubik, sans-serif';x.fillStyle='#7a6a5c';x.fillText(sub,W/2,190)}});
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
+  return m;
+}
+
+// Ground, roads, blocks
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(900,900),M(0x7cb85a));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const span=(G+0.5)*P;
+const roadMat=M(0x8f8d93);
+for(let k=-G-1;k<=G;k++){
+  const p=(k+0.5)*P;
+  const rx=new THREE.Mesh(new THREE.BoxGeometry(P-BLOCK,0.1,span*2+4),roadMat);rx.position.set(p,0.05,0);rx.receiveShadow=true;scene.add(rx);
+  const rz=new THREE.Mesh(new THREE.BoxGeometry(span*2+4,0.1,P-BLOCK),roadMat);rz.position.set(0,0.09,p);rz.receiveShadow=true;scene.add(rz);
+}
+// lane dashes
+{
+  const dashes=[];for(let k=-G-1;k<=G;k++){const p=(k+0.5)*P;for(let t=-span;t<=span;t+=4.5){if(Math.abs(((t%P)+P)%P-P/2)<3)continue;dashes.push([p,t,0],[t,p,1])}}
+  const dm=new THREE.InstancedMesh(new THREE.BoxGeometry(0.28,0.04,1.8),new THREE.MeshBasicMaterial({color:0xf6c945}),dashes.length);
+  const o=new THREE.Object3D();dashes.forEach((d,i)=>{o.position.set(d[0],0.19,d[1]);o.rotation.y=d[2]?Math.PI/2:0;o.updateMatrix();dm.setMatrixAt(i,o.matrix)});scene.add(dm);
+}
+// blocks: sidewalk + lawn
+const isLM=(i,j)=>Math.abs(i)<=1&&Math.abs(j)<=1;
+const blocks=[];for(let i=-G;i<=G;i++)for(let j=-G;j<=G;j++)blocks.push([i,j]);
+{
+  const side=new THREE.InstancedMesh(new THREE.BoxGeometry(BLOCK+1.2,0.3,BLOCK+1.2),M(0xe9dfc6),blocks.length);
+  const lawn=new THREE.InstancedMesh(new THREE.BoxGeometry(BLOCK-0.6,0.36,BLOCK-0.6),M(0x86c45c),blocks.length);
+  const o=new THREE.Object3D();
+  blocks.forEach(([i,j],n)=>{o.position.set(i*P,0.15,j*P);o.updateMatrix();side.setMatrixAt(n,o.matrix);o.position.y=0.2;o.updateMatrix();lawn.setMatrixAt(n,o.matrix)});
+  side.receiveShadow=lawn.receiveShadow=true;scene.add(side,lawn);
+}
+// slots, growing outward ring by ring
+const OFF=[[3.6,3.6],[-3.6,3.6],[-3.6,-3.6],[3.6,-3.6]];
+const slots=[];
+blocks.filter(([i,j])=>!isLM(i,j)).forEach(([i,j])=>OFF.forEach(([ox,oz])=>{
+  const x=i*P+ox,z=j*P+oz;slots.push({x,z,yaw:Math.atan2(ox,oz),ring:Math.max(Math.abs(i),Math.abs(j)),ang:Math.atan2(z,x)});
+}));
+slots.sort((a,b)=>a.ring-b.ring||a.ang-b.ang);
+const CAP=slots.length;
+
+// ===== Landmarks =====
+const anim=[];
+// Central plaza: covers the 3x3 middle blocks
+{
+  const plaza=new THREE.Mesh(new THREE.BoxGeometry(3*P-4,.6,3*P-4),new THREE.MeshStandardMaterial({color:0xf3e7cb,roughness:.9}));plaza.position.y=.3;plaza.receiveShadow=true;scene.add(plaza);
+  [24,26.5].forEach((r,k)=>{const ring=new THREE.Mesh(new THREE.RingGeometry(r-.6,r,96),new THREE.MeshStandardMaterial({color:k?0xe0c995:0xd9bd84,roughness:.9}));ring.rotation.x=-Math.PI/2;ring.position.y=.66;scene.add(ring)});
+}
+
+// Mount Shakshuka: a volcano rising out of a giant skillet
+const VH=17, VB=3.2; // volcano height, base level (pan sauce surface)
+const volcano=new THREE.Group();
+function vr(y){return 4+10.5*Math.pow(1-y/VH,1.7)}
+{
+  // giant skillet
+  const metal=new THREE.MeshStandardMaterial({color:0x2a292c,metalness:.65,roughness:.32});
+  const pan=new THREE.Mesh(new THREE.CylinderGeometry(21.5,19.8,3,96),metal);pan.position.y=2.1;pan.castShadow=pan.receiveShadow=true;volcano.add(pan);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(21.4,.55,12,96),metal);rim.rotation.x=Math.PI/2;rim.position.y=3.6;volcano.add(rim);
+  const handle=new THREE.Mesh(new THREE.BoxGeometry(10,1.2,2.6),metal);handle.position.set(-17.5,3,-17.5);handle.rotation.y=-Math.PI/4;handle.castShadow=true;volcano.add(handle);
+  const grip=new THREE.Mesh(new THREE.TorusGeometry(.7,.22,8,20),metal);grip.position.set(-20.6,3.65,-20.6);grip.rotation.x=Math.PI/2;volcano.add(grip);
+  // sauce pool
+  const pool=new THREE.Mesh(new THREE.CylinderGeometry(20.9,20.9,.4,96),new THREE.MeshPhysicalMaterial({color:0xcf3a1f,roughness:.28,clearcoat:.6,clearcoatRoughness:.3,emissive:0x5a1006,emissiveIntensity:.25}));pool.position.y=3.15;volcano.add(pool);
+  anim.push(t=>{pool.material.emissiveIntensity=.22+Math.sin(t*1.4)*.06});
+
+  // volcano body: lathe profile with rocky noise and a heat gradient
+  const prof=[];for(let y=0;y<=VH;y+=.5)prof.push(new THREE.Vector2(vr(y),y));
+  prof.push(new THREE.Vector2(4.7,VH+.35),new THREE.Vector2(4.3,VH+.6),new THREE.Vector2(3.7,VH+.3),new THREE.Vector2(3.3,VH-.5),new THREE.Vector2(0,VH-.5));
+  const lg=new THREE.LatheGeometry(prof,96);
+  const p=lg.attributes.position,cc=[],c1=new THREE.Color(0x5e1d10),c2=new THREE.Color(0xa8301a),c3=new THREE.Color(0xe8572a),tmp=new THREE.Color();
+  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),a=Math.atan2(z,x),r=Math.hypot(x,z);
+    const n=1+(y<VH-.2?.055*Math.sin(a*7+y*.9)+.035*Math.sin(a*15-y*1.6)+.02*Math.sin(a*31+y*3):0);
+    p.setX(i,x*n);p.setZ(i,z*n);
+    const t=Math.min(1,y/VH);if(t<.55)tmp.copy(c1).lerp(c2,t/.55);else tmp.copy(c2).lerp(c3,(t-.55)/.45);
+    tmp.offsetHSL(0,0,(Math.sin(a*9+y*2)*.03));cc.push(tmp.r,tmp.g,tmp.b)}
+  lg.setAttribute('color',new THREE.Float32BufferAttribute(cc,3));lg.computeVertexNormals();
+  const body=new THREE.Mesh(lg,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78}));body.position.y=VB;body.castShadow=true;body.receiveShadow=true;volcano.add(body);
+
+  // glowing lava streams down the slopes
+  const lavaMat=new THREE.MeshStandardMaterial({color:0xff6a2a,emissive:0xd83a10,emissiveIntensity:.6,roughness:.4});
+  anim.push(t=>{lavaMat.emissiveIntensity=.5+Math.sin(t*3)*.18});
+  for(let k=0;k<6;k++){const a0=k/6*Math.PI*2+.4,pts=[];
+    for(let s=0;s<=14;s++){const y=VH-.1-s*(VH-.6)/14,a=a0+Math.sin(s*.7+k)*.12,r=vr(y)*1.02+.15;pts.push(new THREE.Vector3(Math.cos(a)*r,y+VB,Math.sin(a)*r))}
+    const tube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),60,.45+(k%2)*.15,8,false),lavaMat);volcano.add(tube)}
+
+  // crater lava, glow and bubbles
+  const crater=new THREE.Mesh(new THREE.CylinderGeometry(3.5,3.5,.3,40),new THREE.MeshStandardMaterial({color:0xffa040,emissive:0xff5a14,emissiveIntensity:1.4}));crater.position.y=VB+VH-.2;volcano.add(crater);
+  const glow=new THREE.PointLight(0xff6a2a,2.2,45,1.6);glow.position.y=VB+VH+3;volcano.add(glow);
+  anim.push(t=>{glow.intensity=1.9+Math.sin(t*4)*.5});
+  const bub=[];for(let k=0;k<6;k++){const b=new THREE.Mesh(new THREE.SphereGeometry(.45,14,10),lavaMat);b.userData.ph=k*1.1;b.userData.a=k;volcano.add(b);bub.push(b)}
+  anim.push(t=>{bub.forEach(b=>{const q=((t*.7+b.userData.ph)%1.6)/1.6,a=b.userData.a*2.3+Math.floor(t*.7+b.userData.ph);b.position.set(Math.cos(a)*2.2,VB+VH-.1,Math.sin(a)*2.2);const s=q<.85?q*1.2:0;b.scale.set(s,s*.7,s)})});
+
+  // mascot: Beitzi the egg, mayor of the city
+  const eg=new THREE.SphereGeometry(4.6,48,16);const ep=eg.attributes.position;
+  for(let i=0;i<ep.count;i++){const x=ep.getX(i),z=ep.getZ(i),a=Math.atan2(z,x),k=1+.09*Math.sin(a*5)+.05*Math.sin(a*9+1);ep.setX(i,x*k);ep.setZ(i,z*k)}
+  eg.computeVertexNormals();
+  const white=new THREE.Mesh(eg,new THREE.MeshPhysicalMaterial({color:0xfffdf6,roughness:.35,clearcoat:.5}));white.scale.y=.2;white.position.y=VB+VH+.55;white.castShadow=true;volcano.add(white);
+  const mascot=new THREE.Group();mascot.position.y=VB+VH+2.6;volcano.add(mascot);
+  const yolk=new THREE.Mesh(new THREE.SphereGeometry(2.7,48,32),new THREE.MeshPhysicalMaterial({color:0xffad14,roughness:.18,clearcoat:1,clearcoatRoughness:.08}));yolk.scale.y=.92;yolk.castShadow=true;mascot.add(yolk);
+  const eyeW=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.2}),eyeB=new THREE.MeshStandardMaterial({color:0x1d1410,roughness:.2});
+  const pupils=[];
+  [-.95,.95].forEach(x=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.68,24,16),eyeW);e.position.set(x,.55,2.15);e.scale.z=.7;mascot.add(e);
+    const pu=new THREE.Mesh(new THREE.SphereGeometry(.36,20,14),eyeB);pu.position.set(x,.5,2.62);mascot.add(pu);pupils.push(pu);
+    const hl=new THREE.Mesh(new THREE.SphereGeometry(.12,10,8),eyeW);hl.position.set(x+.13,.68,2.92);mascot.add(hl);
+    const brow=new THREE.Mesh(new THREE.BoxGeometry(.16,.75,.16),eyeB);brow.position.set(x,1.5,2.2);brow.rotation.z=Math.PI/2+(x>0?-.25:.25);mascot.add(brow)});
+  const smile=new THREE.Mesh(new THREE.TorusGeometry(.75,.13,10,30,Math.PI),eyeB);smile.position.set(0,-.35,2.48);smile.rotation.z=Math.PI;mascot.add(smile);
+  const tongue=new THREE.Mesh(new THREE.SphereGeometry(.32,14,10),new THREE.MeshStandardMaterial({color:0xff6f6f}));tongue.position.set(0,-.95,2.45);tongue.scale.set(1,.55,.5);mascot.add(tongue);
+  [-1.6,1.6].forEach(x=>{const ch=new THREE.Mesh(new THREE.SphereGeometry(.38,14,10),new THREE.MeshStandardMaterial({color:0xff7a4f,roughness:.6}));ch.position.set(x,-.15,2.05);ch.scale.z=.35;mascot.add(ch)});
+  // mayor's crown
+  const gold=new THREE.MeshStandardMaterial({color:0xf5c842,metalness:.3,roughness:.28,emissive:0x6a4200,emissiveIntensity:.35});
+  const crown=new THREE.Group();crown.position.y=2.25;crown.rotation.x=-.12;mascot.add(crown);
+  const band=new THREE.Mesh(new THREE.CylinderGeometry(1.45,1.55,.8,32,1,true),gold);band.material.side=THREE.DoubleSide;crown.add(band);
+  const GEMC=[0xe0115f,0x50c878,0x0f52ba];
+  for(let k=0;k<7;k++){const a=k/7*Math.PI*2,sp=new THREE.Mesh(new THREE.ConeGeometry(.28,.9,10),gold);sp.position.set(Math.cos(a)*1.48,.8,Math.sin(a)*1.48);crown.add(sp);
+    const b=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),gold);b.position.set(Math.cos(a)*1.48,1.28,Math.sin(a)*1.48);crown.add(b);
+    const gm=new THREE.Mesh(new THREE.OctahedronGeometry(.2),new THREE.MeshStandardMaterial({color:GEMC[k%3],emissive:GEMC[k%3],emissiveIntensity:.35,roughness:.1}));gm.position.set(Math.cos(a)*1.56,0,Math.sin(a)*1.56);crown.add(gm)}
+  anim.push(t=>{const f=partyOn?3.2:1.5;const b=Math.abs(Math.sin(t*f));mascot.position.y=VB+VH+2.6+b*.7;mascot.scale.set(1+(1-b)*.04,1-(1-b)*.05,1+(1-b)*.04);mascot.rotation.y=partyOn?t*2.2:Math.sin(t*.6)*.45;pupils.forEach(p=>{p.position.x=Math.sign(p.position.x)*.95+Math.sin(t*.9)*.08})});
+
+  // toppings floating in the sauce pool
+  for(let k=0;k<9;k++){const a=k/9*Math.PI*2+.2,r=17+(k%3)*1.1;
+    const w=new THREE.Mesh(eg,white.material);w.scale.set(.36,.07,.36);w.position.set(Math.cos(a)*r,VB+.25,Math.sin(a)*r);w.rotation.y=k;volcano.add(w);
+    const y=new THREE.Mesh(new THREE.SphereGeometry(.62,24,16),yolk.material);y.scale.y=.6;y.position.set(Math.cos(a)*r+.1,VB+.55,Math.sin(a)*r);volcano.add(y)}
+  const tomato=new THREE.MeshPhysicalMaterial({color:0xd8241a,roughness:.2,clearcoat:.8});
+  for(let k=0;k<16;k++){const a=k/16*Math.PI*2+.11,r=15.2+(k%2)*4.6;const tm=new THREE.Mesh(new THREE.SphereGeometry(.75,20,14),tomato);tm.position.set(Math.cos(a)*r,VB+.45,Math.sin(a)*r);tm.castShadow=true;volcano.add(tm);
+    const st=new THREE.Mesh(new THREE.ConeGeometry(.25,.3,5),new THREE.MeshStandardMaterial({color:0x3f8f3a}));st.position.set(tm.position.x,VB+1.25,tm.position.z);volcano.add(st)}
+  const ringG=new THREE.TorusGeometry(.75,.18,8,24);
+  for(let k=0;k<12;k++){const a=k/12*Math.PI*2+.5,r=16+(k%3)*1.6;const rg=new THREE.Mesh(ringG,new THREE.MeshStandardMaterial({color:k%2?0x4f9e35:0xe8a01f,roughness:.4}));rg.rotation.x=Math.PI/2;rg.position.set(Math.cos(a)*r,VB+.3,Math.sin(a)*r);volcano.add(rg)}
+  const leaves=new THREE.InstancedMesh(new THREE.SphereGeometry(.32,6,4),new THREE.MeshStandardMaterial({color:0x3f8f3a,roughness:.7}),60);
+  {const o=new THREE.Object3D();for(let k=0;k<60;k++){const a=R()*Math.PI*2,r=15+R()*5.4;o.position.set(Math.cos(a)*r,VB+.3,Math.sin(a)*r);o.scale.set(1,.25,.6);o.rotation.y=R()*6;o.updateMatrix();leaves.setMatrixAt(k,o.matrix)}}
+  volcano.add(leaves);
+
+  // sign
+  const s=sign('הר השקשוקה','ביצי, ראש העיר',9,4.5);s.position.set(18.2,3.3,18.2);s.rotation.y=Math.PI/4;volcano.add(s);
+  [-3,3].forEach(dx=>{const post=new THREE.Mesh(new THREE.BoxGeometry(.35,1.1,.35),M(0x6b4a2f));post.position.set(18.2+dx*.707,.95,18.2-dx*.707);volcano.add(post)});
+}
+scene.add(volcano);
+// eruption blobs and steam
+const blobs=[],blobGeo=new THREE.SphereGeometry(.7,14,10),blobMat=new THREE.MeshStandardMaterial({color:0xff5a22,emissive:0xd8321a,emissiveIntensity:.8,roughness:.3});
+let nextErupt=1;
+function erupt(){for(let k=0;k<14;k++){const b=new THREE.Mesh(blobGeo,blobMat);const a=Math.random()*Math.PI*2,sp=3+Math.random()*5;b.position.set(Math.cos(a)*2,VB+VH,Math.sin(a)*2);const s=.6+Math.random()*.8;b.scale.set(s,s,s);b.userData.v=new THREE.Vector3(Math.cos(a)*sp,12+Math.random()*7,Math.sin(a)*sp);scene.add(b);blobs.push(b)}}
+const puffs=[],puffGeo=new THREE.SphereGeometry(1,16,12);let nextPuff=0;
+
+// Harissa tower
+{
+  const g=new THREE.Group();g.position.set(19.5,.6,-19.5);
+  const jar=new THREE.Mesh(new THREE.CylinderGeometry(3,3,14,14),new THREE.MeshStandardMaterial({color:0xa6211a,roughness:.3,flatShading:true}));jar.position.y=7.3;jar.castShadow=true;g.add(jar);
+  const lid=new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.2,1.2,14),M(0xd8a531));lid.position.y=14.9;g.add(lid);
+  const band=new THREE.Mesh(new THREE.CylinderGeometry(3.05,3.05,4,14,1,true),new THREE.MeshStandardMaterial({map:canvasTex(1024,256,(x,W,H)=>{x.fillStyle='#fff6e2';x.fillRect(0,0,W,H);x.direction='rtl';x.textAlign='center';x.fillStyle='#a6211a';x.font='800 120px Rubik, sans-serif';[W/4,3*W/4].forEach(cx=>x.fillText('חריסה',cx,170))}),flatShading:true}));band.position.y=8;g.add(band);
+  for(let k=0;k<6;k++){const w=new THREE.Mesh(new THREE.BoxGeometry(.9,1.1,.1),new THREE.MeshStandardMaterial({color:0xffe9a8,emissive:0xffc95a,emissiveIntensity:.5}));const a=k/6*Math.PI*2;w.position.set(Math.sin(a)*3.04,12,Math.cos(a)*3.04);w.rotation.y=a;g.add(w)}
+  const s=sign('מגדל החריסה','',4.5,2.2);s.position.set(0,1.5,6.2);g.add(s);
+  scene.add(g);
+}
+// Olive-oil fountain
+const drops=[];let fountainPos=new THREE.Vector3(-19.5,.6,19.5);
+{
+  const g=new THREE.Group();g.position.copy(fountainPos);g.scale.setScalar(.85);
+  const basin=new THREE.Mesh(new THREE.CylinderGeometry(5.5,5.8,1.2,24),M(0xece2cb));basin.position.y=.6;basin.castShadow=true;g.add(basin);
+  const oil=new THREE.Mesh(new THREE.CylinderGeometry(5,5,.2,24),new THREE.MeshStandardMaterial({color:0xc8a326,roughness:.15,metalness:.2}));oil.position.y=1.15;g.add(oil);
+  const col=new THREE.Mesh(new THREE.CylinderGeometry(.6,.8,3.5,10),M(0xece2cb));col.position.y=2.6;g.add(col);
+  const bowl=new THREE.Mesh(new THREE.CylinderGeometry(2.2,1,.8,16),M(0xece2cb));bowl.position.y=4.5;g.add(bowl);
+  const bottle=new THREE.Mesh(new THREE.CylinderGeometry(.5,.8,2.2,10),new THREE.MeshStandardMaterial({color:0x7a9a2a,roughness:.25}));bottle.position.y=6;g.add(bottle);
+  const s=sign('מזרקת שמן הזית','',5,2);s.position.set(0,1.2,6.4);g.add(s);
+  scene.add(g);
+}
+const dropGeo=new THREE.SphereGeometry(.16,6,4),dropMat=new THREE.MeshBasicMaterial({color:0xe2c043});
+// Sauce river + challah bridge
+{
+  const river=new THREE.Mesh(new THREE.PlaneGeometry(900,RIVER_W),new THREE.MeshStandardMaterial({color:0xcf3d21,roughness:.25,metalness:.1,emissive:0x5a1208,emissiveIntensity:.25}));
+  river.rotation.x=-Math.PI/2;river.position.set(0,.12,RIVER_Z);scene.add(river);
+  anim.push(t=>{river.material.emissiveIntensity=.22+Math.sin(t*1.3)*.06});
+  const banks=new THREE.Mesh(new THREE.PlaneGeometry(900,RIVER_W+3),M(0xe6d29c));banks.rotation.x=-Math.PI/2;banks.position.set(0,.09,RIVER_Z);scene.add(banks);
+  const bx=0.5*P,z0=RIVER_Z-RIVER_W/2-3,z1=RIVER_Z+RIVER_W/2+3,N=26;
+  const bread=new THREE.MeshStandardMaterial({color:0xc98234,roughness:.6,flatShading:true}),bread2=new THREE.MeshStandardMaterial({color:0xb06d24,roughness:.6,flatShading:true});
+  const bg=new THREE.SphereGeometry(1.25,10,8);
+  for(let k=0;k<N;k++){const t=k/(N-1),z=z0+(z1-z0)*t,y=.6+3.2*Math.sin(Math.PI*t);
+    [-1,1].forEach((sd,m)=>{const b=new THREE.Mesh(bg,m?bread:bread2);b.position.set(bx+sd*Math.cos(t*Math.PI*6)*.9,y,z);b.scale.set(1.45,.8,1.05);b.rotation.set(0,sd*.5,0);b.castShadow=true;scene.add(b)})}
+  const sesame=new THREE.InstancedMesh(new THREE.SphereGeometry(.07,4,3),new THREE.MeshBasicMaterial({color:0xfff4d2}),160);const o=new THREE.Object3D();
+  for(let k=0;k<160;k++){const t=R(),y=.6+3.2*Math.sin(Math.PI*t)+.95;o.position.set(bx+(R()-.5)*3,y,z0+(z1-z0)*t);o.updateMatrix();sesame.setMatrixAt(k,o.matrix)}scene.add(sesame);
+  const s=sign('גשר החלה','מעל נהר הרוטב',5.5,2.6);s.position.set(bx-4.5,1.7,z0-1);scene.add(s);
+}
+// Construction site across the river
+{
+  const g=new THREE.Group();g.position.set(-1.5*P,0,RIVER_Z+RIVER_W/2+16);
+  const dirt=new THREE.Mesh(new THREE.BoxGeometry(30,.3,20),M(0xc9a46b));dirt.position.y=.15;dirt.receiveShadow=true;g.add(dirt);
+  const yellow=M(0xf2b51f);
+  const mast=new THREE.Mesh(new THREE.BoxGeometry(1.2,22,1.2),yellow);mast.position.set(6,11,0);mast.castShadow=true;g.add(mast);
+  const jib=new THREE.Group();jib.position.set(6,21.5,0);g.add(jib);
+  const arm=new THREE.Mesh(new THREE.BoxGeometry(22,1,1),yellow);arm.position.x=-7;jib.add(arm);
+  const cw=new THREE.Mesh(new THREE.BoxGeometry(3,2,2),M(0x6d6d72));cw.position.set(3,-.8,0);jib.add(cw);
+  const cable=new THREE.Mesh(new THREE.BoxGeometry(.08,9,.08),M(0x333333));cable.position.set(-15,-4.5,0);jib.add(cable);
+  const hook=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.1,.7,12),M(0x2d2b2e));hook.position.set(-15,-9.3,0);jib.add(hook);
+  anim.push(t=>{jib.rotation.y=Math.sin(t*.25)*.9});
+  for(let k=0;k<12;k++){const f=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.2,.15),M(k%2?0xf2f2f2:0xd63b22));const side=k<6;f.position.set(side?-14+k*2.5:-15,.75,side?-10:-9+(k-6)*2.5);if(!side)f.rotation.y=Math.PI/2;g.add(f)}
+  const s=sign('בקרוב','משהו חדש נבנה כאן',6,3);s.position.set(-6,2.2,10.5);g.add(s);
+  const p1=new THREE.Mesh(new THREE.BoxGeometry(.25,1.2,.25),M(0x6b4a2f));p1.position.set(-6,.6,10.4);g.add(p1);
+  scene.add(g);
+}
+// Cars
+const cars=[];
+{
+  const cols=[0xd63b22,0xf2b51f,0x2f6fb3,0xffffff,0x3f8f3a,0xff8a5c];
+  for(let k=0;k<14;k++){
+    const g=new THREE.Group();
+    const body=new THREE.Mesh(new THREE.BoxGeometry(1.6,.8,3),M(cols[k%cols.length]));body.position.y=.65;body.castShadow=true;g.add(body);
+    const cab=new THREE.Mesh(new THREE.BoxGeometry(1.4,.6,1.5),M(0xdfeaf2));cab.position.set(0,1.3,-.2);g.add(cab);
+    const alongX=k%2===0,lane=(Math.floor(R()*(2*G+2))-G-1+.5)*P,dir=R()<.5?1:-1;
+    g.userData={alongX,lane:lane+dir*1.1,dir,t:(R()*2-1)*span,sp:6+R()*5};
+    scene.add(g);cars.push(g);
+  }
+}
+
+// ===== Houses: every lot has a skillet house; a resident claims the next free one =====
+const ZERO=new THREE.Matrix4().makeScale(0,0,0);
+function inst(geo,mat,n,shadow=true){const m=new THREE.InstancedMesh(geo,mat,n);for(let i=0;i<n;i++)m.setMatrixAt(i,ZERO);m.castShadow=shadow;m.receiveShadow=true;scene.add(m);return m}
+const metal=new THREE.MeshStandardMaterial({color:0x2c2a2e,metalness:.6,roughness:.34});
+const cream=new THREE.MeshStandardMaterial({color:0xf6ead0,roughness:.7});
+const brass=new THREE.MeshStandardMaterial({color:0xe2b03a,metalness:.85,roughness:.25});
+const lidGeo=new THREE.SphereGeometry(2.05,32,12,0,Math.PI*2,0,Math.PI/2);
+const H={
+  pan:inst(new THREE.CylinderGeometry(2.15,1.92,1.5,40),new THREE.MeshStandardMaterial({color:0xffffff,metalness:.2,roughness:.38}),CAP),
+  rim:inst(new THREE.TorusGeometry(2.12,.14,10,40),metal,CAP),
+  sauce:inst(new THREE.CylinderGeometry(2,2,.24,40),new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:.3,clearcoat:.5}),CAP),
+  lid:inst(lidGeo,new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:.05,metalness:0,transparent:true,opacity:.16,depthWrite:false,clearcoat:1}),CAP,false),
+  lidRim:inst(new THREE.TorusGeometry(2.06,.09,8,40),new THREE.MeshStandardMaterial({color:0xc9ccd2,metalness:.9,roughness:.2}),CAP),
+  knob:inst(new THREE.SphereGeometry(.28,16,12),brass,CAP),
+  knobBase:inst(new THREE.CylinderGeometry(.12,.18,.3,12),brass,CAP),
+  handle:inst(new THREE.BoxGeometry(1.7,.3,.48),metal,CAP),
+  grip:inst(new THREE.CylinderGeometry(.3,.3,1.3,14),new THREE.MeshStandardMaterial({color:0x8a5a33,roughness:.6}),CAP),
+  frame:inst(new THREE.BoxGeometry(.98,1.18,.14),cream,CAP),
+  door:inst(new THREE.BoxGeometry(.74,1.0,.16),new THREE.MeshStandardMaterial({color:0xa4663a,roughness:.55}),CAP),
+  doorKnob:inst(new THREE.SphereGeometry(.07,8,6),brass,CAP,false),
+  awning:inst(new THREE.BoxGeometry(1.15,.1,.5),new THREE.MeshStandardMaterial({color:0xd63b22,roughness:.6}),CAP),
+  step:inst(new THREE.BoxGeometry(1.1,.18,.55),cream,CAP),
+  winFrame:inst(new THREE.BoxGeometry(.66,.56,.12),cream,CAP*2),
+  pane:inst(new THREE.BoxGeometry(.5,.4,.13),new THREE.MeshBasicMaterial({color:0xffffff}),CAP*2,false),
+  stone:inst(new THREE.CylinderGeometry(.34,.36,.08,10),new THREE.MeshStandardMaterial({color:0xd8cdb6,roughness:.9}),CAP*3,false),
+  bush:inst(new THREE.IcosahedronGeometry(.42,1),new THREE.MeshStandardMaterial({color:0x4c9a3f,roughness:.8,flatShading:true}),CAP*2),
+  post:inst(new THREE.BoxGeometry(.1,.85,.1),new THREE.MeshStandardMaterial({color:0x6b4a2f}),CAP),
+  mailbox:inst(new THREE.BoxGeometry(.32,.3,.52),new THREE.MeshStandardMaterial({color:0x2f6fb3,roughness:.5}),CAP),
+  flag:inst(new THREE.BoxGeometry(.04,.26,.12),new THREE.MeshStandardMaterial({color:0xd63b22}),CAP,false),
+  white:inst(new THREE.CylinderGeometry(.74,.8,.14,20),new THREE.MeshPhysicalMaterial({color:0xfffdf6,roughness:.35,clearcoat:.4}),CAP*3),
+  yolk:inst(new THREE.SphereGeometry(.34,18,12),new THREE.MeshPhysicalMaterial({color:0xffb01a,roughness:.2,clearcoat:1}),CAP*3),
+  herb:inst(new THREE.BoxGeometry(.18,.05,.18),new THREE.MeshStandardMaterial({color:0x3f8f3a}),CAP*5,false)
+};
+const SAUCES=[0xd63b22,0xc8321f,0xe0491f,0xbf2c1c];
+const GREEN=0x7fae3c, EMPTY_SAUCE=0xb83a24, LIT=new THREE.Color(0xffd970), DARK=new THREE.Color(0x56606f);
+const MAILC=[0x2f6fb3,0xd63b22,0x3f8f3a,0xf2b51f,0x8a5ac8];
+const EGG_PATTERNS=[[[0,0]],[[-.78,.12],[.78,-.12]],[[-.82,.5],[.82,.5],[0,-.85]]];
+const VIP='אדם גלעד 2';
+function houseInfo(r){const h=hash((r.name||'')+'|'+(r.id||''));const g=rng(h);return{vip:cleanName(r.name)===VIP,eggs:1+(h%3),green:(h%7)===3,sauce:SAUCES[h%SAUCES.length],mail:MAILC[h%MAILC.length],herbs:Array.from({length:5},()=>{const a=g()*6.28,d=.4+g()*1.3;return[Math.cos(a)*d,Math.sin(a)*d,g()*3]})}}
+const _b=new THREE.Matrix4(),_l=new THREE.Matrix4(),_m=new THREE.Matrix4(),_q=new THREE.Quaternion(),_e=new THREE.Euler(),_v=new THREE.Vector3(),_s=new THREE.Vector3(),_c=new THREE.Color();
+function L(x,y,z,rx,ry,rz,sx,sy,sz){_e.set(rx,ry,rz);_q.setFromEuler(_e);_v.set(x,y,z);_s.set(sx,sy,sz);return _l.compose(_v,_q,_s)}
+function put(mesh,i,x,y,z,rx=0,ry=0,rz=0,sx=1,sy=1,sz=1){_m.multiplyMatrices(_b,L(x,y,z,rx,ry,rz,sx,sy,sz));mesh.setMatrixAt(i,_m)}
+function writeHouse(si,info,scale){
+  const s=slots[si];_e.set(0,s.yaw,0);_q.setFromEuler(_e);_v.set(s.x,.38,s.z);_s.set(scale,scale,scale);_b.compose(_v,_q,_s);
+  put(H.pan,si,0,.75,0);_c.set(info&&info.vip?0xf2c23a:0x2c2a2e);H.pan.setColorAt(si,_c);
+  put(H.rim,si,0,1.5,0,Math.PI/2);
+  put(H.sauce,si,0,1.47,0);
+  _c.set(info?(info.green?GREEN:info.sauce):EMPTY_SAUCE);H.sauce.setColorAt(si,_c);
+  put(H.lid,si,0,1.6,0,0,0,0,1,.6,1);
+  put(H.lidRim,si,0,1.62,0,Math.PI/2);
+  put(H.knobBase,si,0,2.85,0);put(H.knob,si,0,3.05,0);
+  put(H.handle,si,2.95,1.2,0);put(H.grip,si,4.1,1.2,0,0,0,Math.PI/2);
+  // front: door with frame, awning, step
+  put(H.frame,si,0,.68,1.99);put(H.door,si,0,.62,2.03);put(H.doorKnob,si,-.24,.62,2.13);
+  put(H.awning,si,0,1.3,2.16,-.35);put(H.step,si,0,.09,2.42);
+  [-.95,.95].forEach((a,k)=>{const x=Math.sin(a)*1.98,z=Math.cos(a)*1.98;put(H.winFrame,si*2+k,x,.95,z,0,a);put(H.pane,si*2+k,Math.sin(a)*2.0,.95,Math.cos(a)*2.0,0,a);H.pane.setColorAt(si*2+k,info?LIT:DARK)});
+  [2.95,3.6,4.25].forEach((z,k)=>put(H.stone,si*3+k,(k%2?.12:-.1),.04,z,0,k));
+  [-1,1].forEach((d,k)=>put(H.bush,si*2+k,d*.95,.3,2.55,0,k,0,1,.85,1));
+  put(H.post,si,1.55,.42,3.3);put(H.mailbox,si,1.55,.95,3.3);
+  _c.set(info?info.mail:0x8a8f99);H.mailbox.setColorAt(si,_c);
+  put(H.flag,si,1.73,1.12,3.35,0,0,info?0:-1.4);
+  if(info){const pat=EGG_PATTERNS[info.eggs-1];
+    for(let k=0;k<3;k++){if(k<pat.length){const [x,z]=pat[k];put(H.white,si*3+k,x,1.63,z,0,k);put(H.yolk,si*3+k,x+.05,1.73,z-.05,0,0,0,1,.62,1)}else{H.white.setMatrixAt(si*3+k,ZERO);H.yolk.setMatrixAt(si*3+k,ZERO)}}
+    info.herbs.forEach(([x,z,r],k)=>put(H.herb,si*5+k,x,1.65,z,0,r))}
+  else{for(let k=0;k<3;k++){H.white.setMatrixAt(si*3+k,ZERO);H.yolk.setMatrixAt(si*3+k,ZERO)}for(let k=0;k<5;k++)H.herb.setMatrixAt(si*5+k,ZERO)}
+}
+function hideHouse(si){Object.entries(H).forEach(([k,m])=>{const per=m.instanceMatrix.count/CAP;for(let j=0;j<per;j++)m.setMatrixAt(si*per+j,ZERO)})}
+function flushHouses(){Object.values(H).forEach(m=>{m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true})}
+for(let si=0;si<CAP;si++)hideHouse(si);flushHouses();
+
+// Name labels
+const labels=new Map();
+function makeVipLabel(text){
+  const tex=canvasTex(512,200,(x,W,h)=>{x.direction='rtl';x.textAlign='center';const g=x.createLinearGradient(0,0,W,0);g.addColorStop(0,'#f7d36b');g.addColorStop(1,'#e2a52a');x.fillStyle=g;roundRect(x,40,14,W-80,h-28,44);x.fill();x.lineWidth=8;x.strokeStyle='#2a1d17';x.stroke();x.fillStyle='#2a1d17';x.font='800 58px Rubik, Assistant, sans-serif';x.fillText(text,W/2,92,W-110);x.font='700 38px Assistant, Rubik, sans-serif';x.fillText('מנהל העיר',W/2,148)});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthWrite:false}));sp.scale.set(6.4,2.5,1);sp.renderOrder=2;scene.add(sp);return sp;
+}
+const vipCrown=new THREE.Group();vipCrown.visible=false;scene.add(vipCrown);
+{const gold=new THREE.MeshStandardMaterial({color:0xf5c842,metalness:.3,roughness:.3,emissive:0x6a4200,emissiveIntensity:.35});
+ const gp=new THREE.Mesh(new THREE.CylinderGeometry(2.2,1.97,1.52,40),gold);gp.position.y=-2.42;vipCrown.add(gp);
+ const gr=new THREE.Mesh(new THREE.TorusGeometry(2.17,.16,10,40),gold);gr.rotation.x=Math.PI/2;gr.position.y=-1.67;vipCrown.add(gr);
+ const band=new THREE.Mesh(new THREE.CylinderGeometry(.8,.85,.45,24,1,true),gold);band.material.side=THREE.DoubleSide;vipCrown.add(band);
+ const GC=[0xe0115f,0x50c878,0x0f52ba];
+ for(let k=0;k<6;k++){const a=k/6*Math.PI*2;const c=new THREE.Mesh(new THREE.ConeGeometry(.18,.55,8),gold);c.position.set(Math.cos(a)*.8,.48,Math.sin(a)*.8);vipCrown.add(c);
+  const g=new THREE.Mesh(new THREE.OctahedronGeometry(.12),new THREE.MeshStandardMaterial({color:GC[k%3],emissive:GC[k%3],emissiveIntensity:.4}));g.position.set(Math.cos(a)*.86,0,Math.sin(a)*.86);vipCrown.add(g)}
+ vipCrown.userData.spin=[];vipCrown.children.slice(2).forEach(c=>vipCrown.userData.spin.push(c));}
+function makeLabel(text,mine){
+  const tex=canvasTex(512,128,(x,W,h)=>{x.font='800 54px Rubik, Assistant, sans-serif';x.direction='rtl';const tw=Math.min(x.measureText(text).width,W-60);const bw=tw+56;x.fillStyle=mine?'#ffb51f':'#fff6e2';roundRect(x,(W-bw)/2,10,bw,h-20,40);x.fill();x.lineWidth=7;x.strokeStyle='#2a1d17';x.stroke();x.fillStyle='#2a1d17';x.textAlign='center';x.fillText(text,W/2,h/2+19,W-70)});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthWrite:false}));sp.scale.set(6,1.5,1);sp.renderOrder=2;scene.add(sp);return sp;
+}
+
+// ===== Data =====
+let residents=[],initialLoaded=false,db=null,col=null,user=null,myId=null,canAdmin=false,localMode=false;
+const pops=new Map();
+function render(newIds){
+  const keep=new Set();let vipSlot=-1;
+  const n=Math.min(residents.length,CAP);
+  for(let si=0;si<CAP;si++){
+    const r=si<n?residents[si]:null;
+    if(r){r._info=r._info||houseInfo(r);
+      if(newIds&&newIds.has(r.id))pops.set(si,{t0:performance.now(),info:r._info});
+      if(!pops.has(si))writeHouse(si,r._info,1);
+      const key=r.id+'|'+r.name+'|'+(r.id===myId);keep.add(key);
+      let sp=labels.get(key);if(!sp){sp=r._info.vip?makeVipLabel(r.name):makeLabel(r.name,r.id===myId);labels.set(key,sp)}
+      sp.position.set(slots[si].x,r._info.vip?6.1:4.6,slots[si].z);
+      if(r._info.vip){vipSlot=si}
+    }else{pops.delete(si);hideHouse(si)}
+  }
+  for(const [k,sp] of labels){if(!keep.has(k)){scene.remove(sp);sp.material.map.dispose();sp.material.dispose();labels.delete(k)}}
+  vipCrown.visible=vipSlot>=0;if(vipSlot>=0)vipCrown.position.set(slots[vipSlot].x,3.55,slots[vipSlot].z);
+  Object.values(H).forEach(m=>{m.count=Math.max(1,(m.instanceMatrix.count/CAP)*Math.max(n,1))});
+  flushHouses();
+  $('nHouses').textContent=n;
+  $('nEggs').textContent=residents.slice(0,n).reduce((a,r)=>a+r._info.eggs,0);
+  $('myHouse').hidden=!residents.some(r=>r.id===myId);
+  renderList();
+}
+function setNote(t){const el=$('note');el.textContent=t;el.hidden=!t}
+
+// Sheet (residents list; admins can add and remove)
+const sheet=$('sheet');
+function openSheet(){sheet.hidden=false;$('addForm').hidden=!canAdmin;$('adminBox').hidden=!canAdmin;syncAdminUI();$('sheetTitle').textContent=canAdmin?'ניהול התושבים':'תושבי העיר'}
+$('openList').onclick=openSheet;$('saveSite').onclick=saveSite;
+$('closeSheet').onclick=()=>{sheet.hidden=true};
+$('searchInput').addEventListener('input',renderList);
+$('myHouse').onclick=()=>{const i=residents.findIndex(r=>r.id===myId);if(i>=0)flyToSlot(i,true)};
+function renderList(){
+  const q=$('searchInput').value.trim().toLowerCase();
+  const el=$('list');el.textContent='';
+  if(!residents.length){const d=document.createElement('div');d.className='empty';d.textContent='עדיין אין תושבים בעיר. הבית הראשון ייבנה כשמישהו ייכנס.';el.appendChild(d);return}
+  residents.forEach((r,i)=>{
+    if(q&&!String(r.name).toLowerCase().includes(q))return;
+    const it=document.createElement('div');it.className='item';
+    const num=document.createElement('span');num.className='num';num.textContent='#'+(i+1);
+    const nm=document.createElement('span');nm.className='n';nm.textContent=r.name+(r.id===myId?' (את/ה)':'');
+    const go=document.createElement('button');go.type='button';go.className='go';go.textContent='לבית';go.onclick=()=>{sheet.hidden=true;flyToSlot(i,true)};
+    it.append(num,nm,go);
+    if(canAdmin){[['▲',-1,'להזיז מקום אחד קדימה'],['▼',1,'להזיז מקום אחד אחורה']].forEach(([lbl,d,al])=>{const j=i+d;if(j<0||j>=residents.length)return;const b=document.createElement('button');b.type='button';b.className='mv';b.textContent=lbl;b.setAttribute('aria-label',al);b.onclick=()=>moveResident(i,d);it.appendChild(b)})}
+    if(canAdmin){const del=document.createElement('button');del.type='button';del.className='del';del.textContent='הסרה';
+      del.onclick=()=>{if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='למחוק?';setTimeout(()=>{del.classList.remove('armed');del.textContent='הסרה'},3000);return}removeResident(r)};it.appendChild(del)}
+    el.appendChild(it);
+  });
+}
+function cleanName(v){return String(v||'').replace(/\s+/g,' ').trim().slice(0,30)}
+$('addForm').addEventListener('submit',async e=>{
+  e.preventDefault();const inp=$('nameInput');const name=cleanName(inp.value);if(!name)return;
+  $('msg').textContent='';
+  if(residents.length>=CAP){$('msg').textContent='כל '+CAP+' הבתים בעיר תפוסים.';return}
+  inp.value='';
+  if(localMode){residents=[...residents,{id:'l'+Date.now(),name,at:Date.now()}];onResidents(residents,true);return}
+  try{await col.add({name,at:Date.now()})}catch(err){$('msg').textContent='ההוספה לא נשמרה. נסי שוב בעוד רגע.';inp.value=name}
+});
+let moving=false;
+async function moveResident(i,d){
+  if(moving)return;const a=residents[i],b=residents[i+d];if(!a||!b)return;
+  let ta=b.at,tb=a.at;if(ta===tb){ta=tb+d}
+  if(localMode){a.at=ta;b.at=tb;residents=[...residents].sort((x,y)=>x.at-y.at);render();return}
+  moving=true;$('msg').textContent='';
+  try{await col.doc(a.id).update({at:ta});await col.doc(b.id).update({at:tb})}catch(err){$('msg').textContent='ההזזה לא הצליחה.'}
+  finally{moving=false}
+}
+async function removeResident(r){
+  if(localMode){residents=residents.filter(x=>x.id!==r.id);onResidents(residents,false);return}
+  try{await col.doc(r.id).delete()}catch(err){$('msg').textContent='המחיקה לא הצליחה.'}
+}
+
+// Welcome: ask the visitor's full name and build their house
+const welcome=$('welcome');
+function showWelcome(){welcome.hidden=false;setTimeout(()=>$('fullName').focus(),80)}
+$('skipWelcome').onclick=()=>{welcome.hidden=true;try{sessionStorage.setItem('sc_skip','1')}catch(e){}};
+$('welcomeForm').addEventListener('submit',async e=>{
+  e.preventDefault();const name=cleanName($('fullName').value);
+  if(name.length<2){$('welcomeMsg').textContent='כתבו שם מלא, לפחות שתי אותיות.';return}
+  if(name===VIP&&!canAdmin){$('welcomeMsg').textContent='השם הזה שמור למנהל העיר.';return}
+  if(residents.length>=CAP){$('welcomeMsg').textContent='כל הבתים בעיר תפוסים כרגע.';return}
+  const btn=$('welcomeBtn');btn.disabled=true;$('welcomeMsg').textContent='';
+  if(localMode){myId='me-local';residents=[...residents,{id:myId,name,at:Date.now()}];welcome.hidden=true;onResidents(residents,true);return}
+  try{await col.doc(myId).set({name,at:Date.now()});welcome.hidden=true}
+  catch(err){$('welcomeMsg').textContent='לא הצלחנו לשמור את הבית. נסו שוב בעוד רגע.'}
+  finally{btn.disabled=false}
+});
+function maybeWelcome(){
+  if(!initialLoaded)return;
+  let skipped=false;try{skipped=sessionStorage.getItem('sc_skip')==='1'}catch(e){}
+  if(!skipped&&!residents.some(r=>r.id===myId)&&welcome.hidden)showWelcome();
+}
+
+let knownIds=new Set();
+function onResidents(list,announce){
+  const newIds=new Set();list.forEach(r=>{if(!knownIds.has(r.id))newIds.add(r.id)});
+  knownIds=new Set(list.map(r=>r.id));
+  residents=list;
+  render(announce?newIds:null);
+  if(announce&&newIds.size){const last=list.filter(r=>newIds.has(r.id)).pop();flyToSlot(list.indexOf(last),last.id===myId);toast(last.id===myId?'ברוכים הבאים הביתה, '+last.name+'!':'ברוכים הבאים, '+last.name+'!',last.id===myId?'זה הבית שלך בשקשוקה סיטי':'תושב חדש בשקשוקה סיטי')}
+}
+
+let toastT;function toast(t,s){const el=$('toast');el.textContent=t;if(s){const sm=document.createElement('small');sm.textContent=s;el.appendChild(sm)}el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),3000)}
+
+// ===== City settings: parties and atmosphere (admins only) =====
+const THEMES={day:{sky:0xa9d9f2,hemi:.6,sun:.8,sunC:0xfff1d6,stars:false},sunset:{sky:0xf2a46f,hemi:.48,sun:.7,sunC:0xffa264,stars:false},night:{sky:0x141c38,hemi:.22,sun:.22,sunC:0x9fb4ff,stars:true}};
+let settings={party:false,title:'',theme:'day'},settingsRef=null,savingSettings=false;
+const stars=(()=>{const g=new THREE.BufferGeometry(),p=[];for(let i=0;i<700;i++){const a=Math.random()*Math.PI*2,e=Math.random()*.9+.08,r=300;p.push(Math.cos(a)*Math.cos(e)*r,Math.sin(e)*r,Math.sin(a)*Math.cos(e)*r)}g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));const m=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:1.6,fog:false}));m.visible=false;scene.add(m);return m})();
+function applySettings(v){
+  settings=v;const th=THEMES[v.theme];
+  scene.background.setHex(th.sky);scene.fog.color.setHex(th.sky);hemi.intensity=th.hemi;sun.intensity=th.sun;sun.color.setHex(th.sunC);stars.visible=th.stars;
+  partyOn=v.party;partyGroup.visible=v.party;
+  const pb=$('partyBanner');pb.hidden=!v.party;pb.textContent=v.title||'מסיבה בשקשוקה סיטי!';
+  syncAdminUI();
+}
+function syncAdminUI(){
+  $('partyBtn').textContent=settings.party?'לסיים את המסיבה':'מתחילים!';$('partyTitle').hidden=settings.party;
+  document.querySelectorAll('#themeChips button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.theme===settings.theme)));
+}
+async function saveSettings(patch){
+  const next={...settings,...patch};
+  if(localMode||!settingsRef){applySettings(next);return}
+  if(savingSettings)return;savingSettings=true;$('msg').textContent='';
+  try{await settingsRef.set({party:next.party,title:next.title,theme:next.theme,updatedAt:Date.now()})}catch(err){$('msg').textContent='השינוי לא נשמר.'}
+  finally{savingSettings=false}
+}
+$('partyForm').addEventListener('submit',e=>{e.preventDefault();if(settings.party){saveSettings({party:false})}else{saveSettings({party:true,title:cleanName($('partyTitle').value).slice(0,40)||'מסיבה בשקשוקה סיטי!'});$('partyTitle').value='';sheet.hidden=true;fly={t0:performance.now(),dur:1800,from:cam.target.clone(),to:new THREE.Vector3(0,14,0),r0:cam.radius,r1:110,p0:cam.phi,p1:1.0}}});
+document.querySelectorAll('#themeChips button').forEach(b=>b.onclick=()=>saveSettings({theme:b.dataset.theme}));
+
+// party effects: light beams, fireworks, confetti
+const partyGroup=new THREE.Group();partyGroup.visible=false;scene.add(partyGroup);
+const beams=new THREE.Group();beams.position.set(0,VB+VH+5,0);partyGroup.add(beams);
+[0xff4fa0,0x4fd8ff,0xffe14f,0x8a5cff].forEach((c,k)=>{const g=new THREE.ConeGeometry(5,46,20,1,true);g.translate(0,-23,0);g.rotateX(Math.PI);const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));const piv=new THREE.Group();piv.rotation.y=k/4*Math.PI*2;m.rotation.z=.55;piv.add(m);beams.add(piv)});
+const CONF=220,confetti=new THREE.InstancedMesh(new THREE.PlaneGeometry(.55,.32),new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide}),CONF);partyGroup.add(confetti);
+const confD=[];{const cols=[0xff4fa0,0x4fd8ff,0xffe14f,0x8a5cff,0x5fe07a,0xff7a3c];for(let i=0;i<CONF;i++){confetti.setColorAt(i,new THREE.Color(cols[i%cols.length]));confD.push({x:(Math.random()-.5)*70,y:Math.random()*45+5,z:(Math.random()-.5)*70,s:2+Math.random()*3,r:Math.random()*6,w:Math.random()*4})}}
+const fireworks=[];let nextFw=0;
+function spawnFirework(){const N=70,g=new THREE.BufferGeometry(),pos=new Float32Array(N*3),vel=[];const cx=(Math.random()-.5)*60,cy=38+Math.random()*16,cz=(Math.random()-.5)*60;for(let i=0;i<N;i++){pos[i*3]=cx;pos[i*3+1]=cy;pos[i*3+2]=cz;const u=Math.random()*2-1,a=Math.random()*Math.PI*2,r=Math.sqrt(1-u*u),sp=9+Math.random()*4;vel.push(r*Math.cos(a)*sp,u*sp,r*Math.sin(a)*sp)}g.setAttribute('position',new THREE.BufferAttribute(pos,3));const cols=[0xff4fa0,0x4fd8ff,0xffe14f,0xff7a3c,0x9dff6a,0xffffff];const m=new THREE.Points(g,new THREE.PointsMaterial({color:cols[Math.floor(Math.random()*cols.length)],size:1.1,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));m.userData={vel,life:0};partyGroup.add(m);fireworks.push(m)}
+const _o=new THREE.Object3D();
+function partyTick(t,dt){
+  if(!partyOn)return;
+  beams.rotation.y=t*.9;beams.children.forEach((p,k)=>{p.children[0].rotation.z=.45+Math.sin(t*2+k)*.25});
+  for(let i=0;i<CONF;i++){const d=confD[i];d.y-=d.s*dt;if(d.y<VB){d.y=50;d.x=(Math.random()-.5)*70;d.z=(Math.random()-.5)*70}_o.position.set(d.x+Math.sin(t+d.w)*1.5,d.y,d.z);_o.rotation.set(t*d.s+d.r,t*2+d.r,0);_o.updateMatrix();confetti.setMatrixAt(i,_o.matrix)}
+  confetti.instanceMatrix.needsUpdate=true;
+  if(t>nextFw){spawnFirework();nextFw=t+.45+Math.random()*.4}
+  for(let i=fireworks.length-1;i>=0;i--){const f=fireworks[i],u=f.userData;u.life+=dt;const a=f.geometry.attributes.position;for(let k=0;k<a.count;k++){u.vel[k*3+1]-=6*dt;a.array[k*3]+=u.vel[k*3]*dt;a.array[k*3+1]+=u.vel[k*3+1]*dt;a.array[k*3+2]+=u.vel[k*3+2]*dt;u.vel[k*3]*=.985;u.vel[k*3+2]*=.985}a.needsUpdate=true;f.material.opacity=Math.max(0,1-u.life/1.8);if(u.life>1.8){partyGroup.remove(f);f.geometry.dispose();f.material.dispose();fireworks.splice(i,1)}}
+}
+
+function goLocal(){localMode=true;canAdmin=true;setNote('מצב תצוגה: מה שנוסף כאן לא נשמר');initialLoaded=true;render();maybeWelcome()}
+function goGuest(){localMode=true;canAdmin=false;initialLoaded=true;$('openList').hidden=true;setNote('כדי לקבל בית בשקשוקה סיטי ולראות את התושבים, צריך להתחבר לחשבון Claude');render()}
+const STATIC_RESIDENTS=/*RES*/["אדם גלעד 2"]/*RES*/;
+const STATIC_SETTINGS=/*SET*/{"party":false,"title":"","theme":"day"}/*SET*/;
+function goStatic(){
+  let admin=location.hash==='#admin';try{if(sessionStorage.getItem('sc_admin')==='1')admin=true}catch(e){}
+  localMode=true;canAdmin=admin;initialLoaded=true;
+  residents=STATIC_RESIDENTS.map((name,i)=>({id:'s'+i,name,at:i}));knownIds=new Set(residents.map(r=>r.id));
+  applySettings({party:!!STATIC_SETTINGS.party,title:STATIC_SETTINGS.title||'',theme:THEMES[STATIC_SETTINGS.theme]?STATIC_SETTINGS.theme:'day'});
+  $('openList').textContent=admin?'ניהול':'תושבים';
+  setNote(admin?'מצב עריכה: אחרי שינויים לוחצים "שמירת האתר" ומעלים את הקובץ החדש':'');
+  $('saveSite').hidden=!admin;$('addRes').hidden=!admin;
+  render()}
+function enterAdmin(){try{sessionStorage.setItem('sc_admin','1')}catch(e){}canAdmin=true;$('openList').textContent='ניהול';$('saveSite').hidden=false;$('addRes').hidden=false;
+  setNote('מצב עריכה: אחרי שינויים לוחצים "שמירת האתר" ומעלים את הקובץ החדש');render();toast('ברוך הבא, ראש העיר!','עכשיו אפשר להוסיף תושבים ולעשות מסיבות')}
+let bannerTaps=[];
+$('cityBanner').addEventListener('click',()=>{if(canAdmin)return;const now=Date.now();bannerTaps=bannerTaps.filter(t=>now-t<3000);bannerTaps.push(now);if(bannerTaps.length>=5){bannerTaps=[];$('adminGate').hidden=false;$('gateMsg').textContent='';$('gateCode').value='';setTimeout(()=>$('gateCode').focus(),60)}});
+$('gateCancel').onclick=()=>{$('adminGate').hidden=true};
+$('gateForm').addEventListener('submit',e=>{e.preventDefault();if(cleanName($('gateCode').value)===VIP){$('adminGate').hidden=true;enterAdmin()}else{$('gateMsg').textContent='הקוד לא נכון.'}});
+$('addRes').onclick=()=>{openSheet();setTimeout(()=>{$('nameInput').focus();$('nameInput').scrollIntoView({block:'center'})},60)};
+async function saveSite(){
+  const MR='/*'+'RES*/',MS='/*'+'SET*/';
+  const msg=$('msg');msg.textContent='';msg.style.color='';
+  if(window.claude){msg.textContent='התושבים נוספו בתצוגה. שמירה לכל המבקרים עובדת באתר שמפורסם באינטרנט (Vercel או Netlify).';return}
+  let src;try{src=await (await fetch(location.href.split('#')[0],{cache:'no-store'})).text()}catch(e){msg.textContent='לא הצלחתי לקרוא את האתר. נסו שוב.';return}
+  const r=src.split(MR),st=src.split(MS);
+  if(r.length!==3||st.length!==3){msg.textContent='משהו בקובץ השתנה, אי אפשר לשמור.';return}
+  src=r[0]+MR+JSON.stringify(residents.map(x=>x.name))+MR+r[2];
+  const st2=src.split(MS);src=st2[0]+MS+JSON.stringify({party:settings.party,title:settings.title,theme:settings.theme})+MS+st2[2];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([src],{type:'text/html'}));a.download='index.html';document.body.appendChild(a);a.click();a.remove();
+  msg.style.color='#3f8f3a';msg.textContent='הקובץ ירד. עכשיו מעלים אותו ל-Netlify במקום הישן.';
+}
+async function connect(){goStatic();return;
+  if(!window.claude||!window.claude.use){goLocal();return}
+  db=await window.claude.use('db');
+  if(!db){goGuest();return}
+  try{user=await window.claude.use('user');if(user){myId=await user.id();canAdmin=await user.canEdit()}}catch(e){}
+  if(!myId)myId='anon';
+  $('openList').textContent=canAdmin?'ניהול':'תושבים';
+  col=db.collection('residents');
+  settingsRef=db.collection('settings').doc('city');
+  settingsRef.onSnapshot(snap=>{const v=(snap.exists&&snap.data())||{};applySettings({party:!!v.party,title:String(v.title||'').slice(0,40),theme:THEMES[v.theme]?v.theme:'day'})},()=>{});
+  const timer=setTimeout(()=>setNote('לא מצליח להגיע לרשימת התושבים כרגע'),10000);
+  col.orderBy('at').onSnapshot(snap=>{
+    const list=snap.docs.map(d=>{const v=d.data()||{};return{id:d.id,name:cleanName(v.name),at:v.at||0}}).filter(r=>r.name);
+    list.forEach(r=>{const old=residents.find(x=>x.id===r.id&&x.name===r.name);if(old)r._info=old._info});
+    const first=!initialLoaded;
+    if(!snap.metadata.fromCache){clearTimeout(timer);initialLoaded=true;setNote('')}
+    if(first&&!snap.metadata.fromCache){knownIds=new Set(list.map(r=>r.id));residents=list;render();maybeWelcome();return}
+    onResidents(list,initialLoaded);
+  },err=>{clearTimeout(timer);goGuest()});
+}
+
+// ===== Camera (orbit: drag to turn, pinch or wheel to zoom) =====
+const cam={target:new THREE.Vector3(0,8,0),theta:.65,phi:.92,radius:110};
+let fly=null;
+function flyToSlot(i,zoom){const s=slots[i];if(!s)return;fly={t0:performance.now(),dur:1600,from:cam.target.clone(),to:new THREE.Vector3(s.x,2,s.z),r0:cam.radius,r1:zoom?30:Math.min(Math.max(cam.radius,45),70),p0:cam.phi,p1:.85}}
+const ptrs=new Map();let pinch0=0,r0=0;
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});fly=null;if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y);r0=cam.radius}});
+canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;
+  if(ptrs.size===1){cam.theta-=(e.clientX-p.x)*.006;cam.phi=Math.min(1.35,Math.max(.25,cam.phi-(e.clientY-p.y)*.005))}
+  p.x=e.clientX;p.y=e.clientY;
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch0)cam.radius=Math.min(230,Math.max(18,r0*pinch0/d))}});
+function up(e){ptrs.delete(e.pointerId);pinch0=0}
+canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+canvas.addEventListener('wheel',e=>{e.preventDefault();cam.radius=Math.min(230,Math.max(18,cam.radius*(1+e.deltaY*.001)))},{passive:false});
+
+// Film mode
+let film=false;
+$('film').onclick=e=>{e.stopPropagation();film=true;document.body.classList.add('film');$('filmhint').hidden=false;sheet.hidden=true;fly={t0:performance.now(),dur:2000,from:cam.target.clone(),to:new THREE.Vector3(0,8,0),r0:cam.radius,r1:100,p0:cam.phi,p1:.9};setTimeout(()=>{$('filmhint').hidden=true},2500)};
+canvas.addEventListener('click',()=>{if(film){film=false;document.body.classList.remove('film');$('filmhint').hidden=true}});
+
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?60:45;camera.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clock=new THREE.Clock();
+function ease(t){const c=1.9;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2)}
+function loop(){
+  const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime,now=performance.now();
+  if(film&&!fly)cam.theta+=dt*.12;
+  if(fly){let k=Math.min(1,(now-fly.t0)/fly.dur);const s=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;cam.target.lerpVectors(fly.from,fly.to,s);cam.radius=fly.r0+(fly.r1-fly.r0)*s;cam.phi=fly.p0+(fly.p1-fly.p0)*s;if(k>=1)fly=null}
+  const sp=Math.sin(cam.phi);
+  camera.position.set(cam.target.x+cam.radius*sp*Math.sin(cam.theta),cam.target.y+cam.radius*Math.cos(cam.phi),cam.target.z+cam.radius*sp*Math.cos(cam.theta));
+  camera.lookAt(cam.target);
+
+  if(!reduce)anim.forEach(f=>f(t));
+  if(!reduce)partyTick(t,dt);
+  // pops
+  if(pops.size){for(const [si,p] of pops){const k=Math.min(1,(now-p.t0)/900);writeHouse(si,p.info,Math.max(.05,ease(k)));if(k>=1)pops.delete(si)}flushHouses()}
+  // eruption
+  if(!reduce&&t>nextErupt){erupt();nextErupt=t+2.2+Math.random()*1.5}
+  for(let i=blobs.length-1;i>=0;i--){const b=blobs[i];b.userData.v.y-=22*dt;b.position.addScaledVector(b.userData.v,dt);if(b.position.y<VB+.2){scene.remove(b);blobs.splice(i,1)}}
+  if(!reduce&&t>nextPuff&&puffs.length<26){const m=new THREE.Mesh(puffGeo,new THREE.MeshStandardMaterial({color:0xfff3ea,transparent:true,opacity:.5,roughness:1,depthWrite:false}));const a=Math.random()*6.28;m.position.set(Math.cos(a)*1.5,VB+VH+1,Math.sin(a)*1.5);m.userData={life:0,v:new THREE.Vector3((Math.random()-.5)*1.2,3+Math.random()*1.5,(Math.random()-.5)*1.2)};scene.add(m);puffs.push(m);nextPuff=t+.28}
+  for(let i=puffs.length-1;i>=0;i--){const m=puffs[i],u=m.userData;u.life+=dt;m.position.addScaledVector(u.v,dt);const s=1+u.life*1.1;m.scale.set(s,s,s);m.material.opacity=Math.max(0,.5*(1-u.life/4.5));if(u.life>4.5){scene.remove(m);m.material.dispose();puffs.splice(i,1)}}
+  // fountain drops
+  if(!reduce&&drops.length<70){const d=new THREE.Mesh(dropGeo,dropMat);const a=Math.random()*6.28,s=1.5+Math.random();d.position.set(fountainPos.x,7,fountainPos.z);d.userData.v=new THREE.Vector3(Math.cos(a)*s,4+Math.random()*2,Math.sin(a)*s);scene.add(d);drops.push(d)}
+  for(let i=drops.length-1;i>=0;i--){const d=drops[i];d.userData.v.y-=14*dt;d.position.addScaledVector(d.userData.v,dt);if(d.position.y<1.2){scene.remove(d);drops.splice(i,1)}}
+  // cars
+  if(!reduce)cars.forEach(c=>{const u=c.userData;u.t+=u.dir*u.sp*dt;if(u.t>span)u.t=-span;if(u.t<-span)u.t=span;if(u.alongX){c.position.set(u.t,0,u.lane);c.rotation.y=u.dir>0?Math.PI/2:-Math.PI/2}else{c.position.set(u.lane,0,u.t);c.rotation.y=u.dir>0?0:Math.PI}});
+  // label fade by distance
+  for(const sp of labels.values()){const d=sp.position.distanceTo(camera.position);sp.material.opacity=d<150?1:Math.max(0,1-(d-150)/60);sp.visible=sp.material.opacity>0.02}
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+render();
+(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(()=>{for(const [k,sp] of labels){scene.remove(sp);sp.material.map.dispose();sp.material.dispose()}labels.clear();render()});
+loop();
+connect();
+})();
+</script>
+
+</body></html>
