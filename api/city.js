@@ -1,4 +1,4 @@
-import { put, get, BlobPreconditionFailedError } from '@vercel/blob';
+import { put, get } from '@vercel/blob';
 const KEY='city-state.json';
 const MAYOR='אדם גלעד 2';
 const MAX_RESIDENTS=448; // every lot in the city (121 blocks minus the 9 centre blocks, 4 lots each)
@@ -22,9 +22,8 @@ async function load(){
   return {state,etag:file.blob.etag};
  }catch(e){if(e?.status===404||e?.code==='blob_not_found')return {state:structuredClone(INITIAL),etag:null};throw e}
 }
-async function store(state,etag){
+async function store(state){
  const opts={access:'private',addRandomSuffix:false,allowOverwrite:true,contentType:'application/json',cacheControlMaxAge:60};
- if(etag)opts.ifMatch=etag; // only save if nobody else saved in between
  await put(KEY,JSON.stringify(state),opts);
 }
 export default async function handler(req,res){
@@ -40,7 +39,7 @@ export default async function handler(req,res){
  let body=req.body||{};
  try{if(typeof body==='string')body=JSON.parse(body)}catch(e){return res.status(400).json({error:'bad json'})}
  if(body.action==='check')return res.status(200).json({ok:true});
- for(let attempt=0;attempt<4;attempt++){
+ {
   try{
    const {state,etag}=await load();
    if(req.method==='POST'){
@@ -58,12 +57,10 @@ export default async function handler(req,res){
     if(!a||!b)return res.status(404).json({error:'not found'});
     [a.at,b.at]=[b.at,a.at];
    }else{return res.status(400).json({error:'bad action'})}
-   await store(state,etag);
+   await store(state);
    return res.status(200).json(state);
   }catch(e){
-   if(e instanceof BlobPreconditionFailedError||e?.code==='precondition_failed'){await new Promise(r=>setTimeout(r,150*(attempt+1)));continue}
-   console.error(e);return res.status(500).json({error:'save failed'});
+   console.error(e);return res.status(500).json({error:'save failed',detail:String(e?.message||e).slice(0,200)});
   }
  }
- return res.status(409).json({error:'busy, try again'});
 }
