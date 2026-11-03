@@ -1,0 +1,40 @@
+name: Add-resident test (adds one test house, then removes it)
+on:
+  push:
+    branches: [city-data]
+    paths: ['.github/workflows/add-test.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: city-data }
+      - name: Try adding and removing a test house on the live site
+        run: |
+          set +e
+          mkdir -p data
+          URL=https://shakshuka-city.vercel.app/api/city
+          KEY=$(python3 -c "import urllib.parse;print(urllib.parse.quote('אדם גלעד 2'))")
+          {
+            echo "status: $(curl -sS $URL?status=1)"
+            echo "count before: $(curl -sS $URL | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["residents"]))')"
+            R=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -H "x-city-admin: $KEY" -d '{"name":"בדיקת מערכת"}' $URL)
+            echo "add -> $(echo "$R" | tail -1) $(echo "$R" | head -1 | cut -c1-300)"
+            ID=$(curl -sS $URL | python3 -c 'import json,sys;r=[x for x in json.load(sys.stdin)["residents"] if x["name"]=="בדיקת מערכת"];print(r[-1]["id"] if r else "")')
+            echo "found test house id: $ID"
+            if [ -n "$ID" ]; then
+              D=$(curl -sS -w '\n%{http_code}' -X PATCH -H 'Content-Type: application/json' -H "x-city-admin: $KEY" -d "{\"action\":\"delete\",\"id\":\"$ID\"}" $URL)
+              echo "delete -> $(echo "$D" | tail -1)"
+            fi
+            echo "count after: $(curl -sS $URL | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["residents"]))')"
+            date -u +%Y-%m-%dT%H:%M:%SZ
+          } > data/add-test.txt 2>&1
+          cat data/add-test.txt
+      - name: Save result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/add-test.txt && git commit -m "Add test result" && git push origin HEAD:city-data || true
