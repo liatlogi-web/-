@@ -74,6 +74,9 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(-
 .item button.go{color:var(--parsley);font-weight:700}
 .item button.del.armed{background:var(--tomato);color:#fff}
 .empty{color:var(--muted);font-size:15px;line-height:1.5;padding:6px 2px}
+.keystate{font-size:14px;color:var(--muted)}
+.keystate.ok{color:#3f8f3a;font-weight:700}
+.keystate.bad{color:var(--tomato);font-weight:700}
 .msg{font-size:14px;color:var(--tomato);min-height:1em}
 .toast{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%) scale(.85);background:var(--cream);border:3px solid var(--ink);box-shadow:0 5px 0 var(--ink);border-radius:16px;padding:10px 18px;font-family:var(--display);font-weight:800;font-size:22px;text-align:center;opacity:0;transition:opacity .3s,transform .3s cubic-bezier(.3,1.6,.5,1);pointer-events:none;max-width:86vw}
 .toast small{display:block;font-family:var(--body);font-weight:600;font-size:15px;color:var(--muted)}
@@ -110,6 +113,10 @@ body.film .pad,body.film .top .note,body.film .bar,body.film .sheet,body.film .w
     <button class="btn" id="closeSheet" type="button" style="padding:6px 14px;font-size:14px">סגירה</button>
   </div>
   <div class="admin" id="adminBox" hidden>
+    <div class="sec"><b>קוד ניהול</b>
+      <form class="row" id="keyForm" autocomplete="off"><input id="keyInput" type="password" placeholder="הקוד מ-Vercel" aria-label="קוד ניהול"><button class="btn primary" type="submit" style="flex:none;padding:10px 14px">חיבור</button></form>
+      <div class="keystate" id="keyState">כדי להוסיף ולמחוק תושבים, הקלידו את קוד הניהול ולחצו "חיבור".</div>
+    </div>
     <div class="sec"><b>מסיבה בעיר</b>
       <form class="row" id="partyForm" autocomplete="off"><input id="partyTitle" maxlength="40" placeholder="שם המסיבה" aria-label="שם המסיבה"><button class="btn primary" id="partyBtn" type="submit">מתחילים!</button></form>
     </div>
@@ -731,8 +738,8 @@ $('addForm').addEventListener('submit',async e=>{
   e.preventDefault();const inp=$('nameInput');const name=cleanName(inp.value);if(!name)return;
   $('msg').textContent='';
   if(residents.length>=CAP){$('msg').textContent='כל '+CAP+' הבתים בעיר תפוסים.';return}
+  if(localMode){const ok=await cloudWrite('POST',{name});if(ok){inp.value='';toast('נוסף בית ל'+name+'!')}return}
   inp.value='';
-  if(localMode){await cloudWrite('POST',{name});return}
   try{await col.add({name,at:Date.now()})}catch(err){$('msg').textContent='ההוספה לא נשמרה. נסי שוב בעוד רגע.';inp.value=name}
 });
 let moving=false;
@@ -905,17 +912,33 @@ async function saveSite(){await cloudRefresh();$('msg').textContent='האתר מ
 }
 
 let cloudBusy=false,cloudKey='';
+try{cloudKey=localStorage.getItem('sc_city_key')||''}catch(e){}
+function keyState(text,cls){const el=$('keyState');el.textContent=text;el.className='keystate'+(cls?' '+cls:'')}
+function needKey(){const k=$('keyInput');if(k){k.focus();k.scrollIntoView({block:'center'})}}
 async function cloudCall(method='GET',body){
  const headers={'Content-Type':'application/json'};
  if(method!=='GET'){
-  if(!cloudKey)cloudKey=prompt('הכנס קוד ניהול ענן (הקוד שהגדרת ב-Vercel):')||'';
-  if(!cloudKey)throw new Error('לא הוזן קוד ניהול');
+  if(!cloudKey){needKey();throw new Error('קודם הקלידו את קוד הניהול למעלה ולחצו "חיבור".')}
   headers['x-city-admin']=cloudKey;
  }
  const response=await fetch('/api/city',{method,headers,body:body?JSON.stringify(body):undefined,cache:'no-store'});
- if(!response.ok){if(response.status===403)cloudKey='';throw new Error('שמירה בענן נכשלה ('+response.status+')')}
+ if(!response.ok){
+  if(response.status===403){cloudKey='';try{localStorage.removeItem('sc_city_key')}catch(e){}keyState('קוד הניהול לא נכון. נסו שוב.','bad');needKey();throw new Error('קוד הניהול לא נכון.')}
+  if(response.status===503){keyState('ב-Vercel עוד לא הוגדר קוד ניהול (CITY_ADMIN_KEY).','bad');throw new Error('ב-Vercel עוד לא הוגדר קוד ניהול.')}
+  if(response.status===409)throw new Error('העיר מלאה, או שמישהו שמר בדיוק עכשיו. נסו שוב.');
+  throw new Error('השמירה בענן נכשלה ('+response.status+'). נסו שוב בעוד רגע.');
+ }
  return response.json();
 }
+$('keyForm').addEventListener('submit',async e=>{
+ e.preventDefault();const v=$('keyInput').value.trim();if(!v)return;
+ cloudKey=v;keyState('בודק את הקוד…');
+ try{await cloudCall('PATCH',{action:'check'});try{localStorage.setItem('sc_city_key',v)}catch(_){}$('keyInput').value='';keyState('✓ מחובר. אפשר להוסיף, להזיז ולמחוק תושבים.','ok')}
+ catch(err){if(!/קוד/.test($('keyState').textContent))keyState(err.message,'bad')}
+});
+(async()=>{try{const r=await fetch('/api/city?status=1',{cache:'no-store'});const j=await r.json();
+  if(j&&j.adminConfigured===false)keyState('ב-Vercel עוד לא הוגדר קוד ניהול (CITY_ADMIN_KEY).','bad');
+  else if(cloudKey)keyState('✓ הקוד שמור בטלפון הזה.','ok')}catch(e){}})();
 async function cloudRefresh(){
  if(cloudBusy)return;
  try{
@@ -934,7 +957,7 @@ async function cloudRefresh(){
 async function cloudWrite(method,body){
  cloudBusy=true;
  try{const data=await cloudCall(method,body);await cloudRefreshAfter(data);return true}
- catch(err){$('msg').textContent=err.message;return false}
+ catch(err){const m=$('msg');m.style.color='';m.textContent=err.message;toast('לא נשמר',err.message);return false}
  finally{cloudBusy=false}
 }
 async function cloudRefreshAfter(data){

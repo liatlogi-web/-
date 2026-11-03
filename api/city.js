@@ -29,13 +29,16 @@ async function store(state,etag){
 }
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
+ if(req.method==='GET'&&req.query&&req.query.status!==undefined)return res.status(200).json({adminConfigured:!!process.env.CITY_ADMIN_KEY});
  if(req.method==='GET'){try{return res.status(200).json((await load()).state)}catch(e){console.error(e);return res.status(500).json({error:'storage unavailable'})}}
  if(!['POST','PATCH','DELETE'].includes(req.method))return res.status(405).end();
  // Only the mayor (holder of CITY_ADMIN_KEY) may change the city, including adding houses.
- const admin=!!process.env.CITY_ADMIN_KEY && req.headers['x-city-admin']===process.env.CITY_ADMIN_KEY;
+ if(!process.env.CITY_ADMIN_KEY)return res.status(503).json({error:'not_configured'});
+ const admin=req.headers['x-city-admin']===process.env.CITY_ADMIN_KEY;
  if(!admin)return res.status(403).json({error:'admin required'});
  let body=req.body||{};
  try{if(typeof body==='string')body=JSON.parse(body)}catch(e){return res.status(400).json({error:'bad json'})}
+ if(body.action==='check')return res.status(200).json({ok:true});
  for(let attempt=0;attempt<4;attempt++){
   try{
    const {state,etag}=await load();
