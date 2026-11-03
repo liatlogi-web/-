@@ -113,10 +113,6 @@ body.film .pad,body.film .top .note,body.film .bar,body.film .sheet,body.film .w
     <button class="btn" id="closeSheet" type="button" style="padding:6px 14px;font-size:14px">סגירה</button>
   </div>
   <div class="admin" id="adminBox" hidden>
-    <div class="sec"><b>קוד ניהול</b>
-      <form class="row" id="keyForm" autocomplete="off"><input id="keyInput" type="password" placeholder="הקוד מ-Vercel" aria-label="קוד ניהול"><button class="btn primary" type="submit" style="flex:none;padding:10px 14px">חיבור</button></form>
-      <div class="keystate" id="keyState">כדי להוסיף ולמחוק תושבים, הקלידו את קוד הניהול ולחצו "חיבור".</div>
-    </div>
     <div class="sec"><b>מסיבה בעיר</b>
       <form class="row" id="partyForm" autocomplete="off"><input id="partyTitle" maxlength="40" placeholder="שם המסיבה" aria-label="שם המסיבה"><button class="btn primary" id="partyBtn" type="submit">מתחילים!</button></form>
     </div>
@@ -896,7 +892,10 @@ function enterAdmin(){try{sessionStorage.setItem('sc_admin','1')}catch(e){}canAd
 let bannerTaps=[];
 $('cityBanner').addEventListener('click',()=>{if(canAdmin)return;const now=Date.now();bannerTaps=bannerTaps.filter(t=>now-t<3000);bannerTaps.push(now);if(bannerTaps.length>=5){bannerTaps=[];$('adminGate').hidden=false;$('gateMsg').textContent='';$('gateCode').value='';setTimeout(()=>$('gateCode').focus(),60)}});
 $('gateCancel').onclick=()=>{$('adminGate').hidden=true};
-$('gateForm').addEventListener('submit',e=>{e.preventDefault();if(cleanName($('gateCode').value)===VIP){$('adminGate').hidden=true;enterAdmin()}else{$('gateMsg').textContent='הקוד לא נכון.'}});
+$('gateForm').addEventListener('submit',async e=>{e.preventDefault();const code=cleanName($('gateCode').value);if(!code)return;
+  $('gateMsg').textContent='בודק…';const prevKey=cloudKey,prevAdmin=canAdmin;cloudKey=code;canAdmin=true;
+  try{await cloudCall('PATCH',{action:'check'});try{localStorage.setItem('sc_city_key',code)}catch(_){}$('adminGate').hidden=true;enterAdmin()}
+  catch(err){cloudKey=prevKey;canAdmin=prevAdmin;$('gateMsg').textContent='הקוד לא נכון.'}});
 $('addRes').onclick=()=>{openSheet();setTimeout(()=>{$('nameInput').focus();$('nameInput').scrollIntoView({block:'center'})},60)};
 async function saveSite(){await cloudRefresh();$('msg').textContent='האתר מתעדכן ונשמר בענן אוטומטית. לא צריך להוריד קובץ.';return;
   const MR='/*'+'RES*/',MS='/*'+'SET*/';
@@ -913,32 +912,20 @@ async function saveSite(){await cloudRefresh();$('msg').textContent='האתר מ
 
 let cloudBusy=false,cloudKey='';
 try{cloudKey=localStorage.getItem('sc_city_key')||''}catch(e){}
-function keyState(text,cls){const el=$('keyState');el.textContent=text;el.className='keystate'+(cls?' '+cls:'')}
-function needKey(){const k=$('keyInput');if(k){k.focus();k.scrollIntoView({block:'center'})}}
 async function cloudCall(method='GET',body){
  const headers={'Content-Type':'application/json'};
  if(method!=='GET'){
-  if(!cloudKey){needKey();throw new Error('קודם הקלידו את קוד הניהול למעלה ולחצו "חיבור".')}
-  headers['x-city-admin']=cloudKey;
+  if(!canAdmin)throw new Error('רק ראש העיר יכול לשנות את העיר.');
+  headers['x-city-admin']=encodeURIComponent(cloudKey||VIP);
  }
  const response=await fetch('/api/city',{method,headers,body:body?JSON.stringify(body):undefined,cache:'no-store'});
  if(!response.ok){
-  if(response.status===403){cloudKey='';try{localStorage.removeItem('sc_city_key')}catch(e){}keyState('קוד הניהול לא נכון. נסו שוב.','bad');needKey();throw new Error('קוד הניהול לא נכון.')}
-  if(response.status===503){keyState('ב-Vercel עוד לא הוגדר קוד ניהול (CITY_ADMIN_KEY).','bad');throw new Error('ב-Vercel עוד לא הוגדר קוד ניהול.')}
+  if(response.status===403){cloudKey='';try{localStorage.removeItem('sc_city_key')}catch(e){}throw new Error('קוד ראש העיר לא התקבל. צאו ונכנסו שוב (5 לחיצות על הכותרת).')}
   if(response.status===409)throw new Error('העיר מלאה, או שמישהו שמר בדיוק עכשיו. נסו שוב.');
   throw new Error('השמירה בענן נכשלה ('+response.status+'). נסו שוב בעוד רגע.');
  }
  return response.json();
 }
-$('keyForm').addEventListener('submit',async e=>{
- e.preventDefault();const v=$('keyInput').value.trim();if(!v)return;
- cloudKey=v;keyState('בודק את הקוד…');
- try{await cloudCall('PATCH',{action:'check'});try{localStorage.setItem('sc_city_key',v)}catch(_){}$('keyInput').value='';keyState('✓ מחובר. אפשר להוסיף, להזיז ולמחוק תושבים.','ok')}
- catch(err){if(!/קוד/.test($('keyState').textContent))keyState(err.message,'bad')}
-});
-(async()=>{try{const r=await fetch('/api/city?status=1',{cache:'no-store'});const j=await r.json();
-  if(j&&j.adminConfigured===false)keyState('ב-Vercel עוד לא הוגדר קוד ניהול (CITY_ADMIN_KEY).','bad');
-  else if(cloudKey)keyState('✓ הקוד שמור בטלפון הזה.','ok')}catch(e){}})();
 async function cloudRefresh(){
  if(cloudBusy)return;
  try{
