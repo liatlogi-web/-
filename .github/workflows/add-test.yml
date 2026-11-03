@@ -4,6 +4,10 @@ on:
     branches: [city-data]
     paths: ['.github/workflows/add-test.yml']
   workflow_dispatch:
+    inputs:
+      base:
+        description: site base URL
+        default: https://shakshuka-city.vercel.app
 permissions:
   contents: write
 jobs:
@@ -16,7 +20,8 @@ jobs:
         run: |
           set +e
           mkdir -p data
-          URL=https://shakshuka-city.vercel.app/api/city
+          URL=${{ github.event.inputs.base || 'https://shakshuka-city.vercel.app' }}/api/city
+          echo "testing $URL"
           KEY=$(python3 -c "import urllib.parse;print(urllib.parse.quote('אדם גלעד 2'))")
           {
             echo "status: $(curl -sS $URL?status=1)"
