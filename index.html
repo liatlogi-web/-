@@ -650,6 +650,7 @@ function writeHouse(si,info,scale){
   else{for(let k=0;k<3;k++){H.white.setMatrixAt(si*3+k,ZERO);H.yolk.setMatrixAt(si*3+k,ZERO)}for(let k=0;k<5;k++)H.herb.setMatrixAt(si*5+k,ZERO)}
 }
 function hideHouse(si){Object.entries(H).forEach(([k,m])=>{const per=m.instanceMatrix.count/CAP;for(let j=0;j<per;j++)m.setMatrixAt(si*per+j,ZERO)})}
+Object.values(H).forEach(m=>{if(!m.instanceColor)m.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(m.instanceMatrix.count*3).fill(1),3)});
 function flushHouses(){Object.values(H).forEach(m=>{m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true})}
 for(let si=0;si<CAP;si++)hideHouse(si);flushHouses();
 
@@ -906,7 +907,7 @@ async function saveSite(){await cloudRefresh();$('msg').textContent='האתר מ
 let cloudBusy=false,cloudKey='';
 async function cloudCall(method='GET',body){
  const headers={'Content-Type':'application/json'};
- if(method==='PATCH'){
+ if(method!=='GET'){
   if(!cloudKey)cloudKey=prompt('הכנס קוד ניהול ענן (הקוד שהגדרת ב-Vercel):')||'';
   if(!cloudKey)throw new Error('לא הוזן קוד ניהול');
   headers['x-city-admin']=cloudKey;
@@ -925,7 +926,7 @@ async function cloudRefresh(){
   initialLoaded=true;
   onResidents(list,had);
   const v=data.settings||{};
-  applySettings({party:!!v.party,title:String(v.title||''),theme:THEMES[v.theme]?v.theme:'day'});
+  applySettings({party:!!v.party,title:String(v.title||''),theme:THEMES[v.theme]?v.theme:'day',reveal:v.reveal||settings.reveal||STATIC_SETTINGS.reveal||''});
   setNote('');
   if(!residents.some(r=>r.id===myId)) maybeWelcome();
  }catch(err){setNote('אין חיבור לשמירה בענן. שינויים חדשים לא יישמרו.')}
@@ -939,7 +940,7 @@ async function cloudWrite(method,body){
 async function cloudRefreshAfter(data){
  const list=(data.residents||[]).map(r=>({id:r.id,name:cleanName(r.name),at:r.at})).sort((a,b)=>a.at-b.at);
  onResidents(list,true);
- if(data.settings)applySettings({party:!!data.settings.party,title:data.settings.title||'',theme:THEMES[data.settings.theme]?data.settings.theme:'day'});
+ if(data.settings)applySettings({party:!!data.settings.party,title:data.settings.title||'',theme:THEMES[data.settings.theme]?data.settings.theme:'day',reveal:data.settings.reveal||settings.reveal||STATIC_SETTINGS.reveal||''});
 }
 
 async function connect(){goStatic();await cloudRefresh();setInterval(cloudRefresh,8000);return;
