@@ -19,7 +19,7 @@ jobs:
           mkdir -p data
           curl -fsS https://shakshuka-city.vercel.app/api/city -o data/city-state.json
           curl -fsS https://shakshuka-city.vercel.app/ -o data/site.html
-          curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"name":"probe"}' https://shakshuka-city.vercel.app/api/city > data/post-without-key.txt || true
+          curl -sS https://shakshuka-city.vercel.app/api/city?status=1 -o data/admin-status.json || true
           date -u +%Y-%m-%dT%H:%M:%SZ > data/fetched-at.txt
       - name: Save snapshot
         run: |
