@@ -87,6 +87,19 @@ body.sheet-open .pad{display:none!important}
 .toast{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%) scale(.85);background:var(--cream);border:3px solid var(--ink);box-shadow:0 5px 0 var(--ink);border-radius:16px;padding:10px 18px;font-family:var(--display);font-weight:800;font-size:22px;text-align:center;opacity:0;transition:opacity .3s,transform .3s cubic-bezier(.3,1.6,.5,1);pointer-events:none;max-width:86vw}
 .toast small{display:block;font-family:var(--body);font-weight:600;font-size:15px;color:var(--muted)}
 .toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.igorhud{position:relative;margin-top:6px;background:rgba(43,21,48,.88);color:#fff;border:3px solid var(--ink);border-radius:14px;box-shadow:0 4px 0 var(--ink);padding:5px 10px;display:flex;flex-direction:column;gap:3px;max-width:300px;margin-inline:auto;text-align:center}
+.igorhud b{font-family:var(--display);font-size:14px;color:var(--yolk)}
+.igorhud span{font-size:13px}
+.igorbar{position:relative;height:18px;border-radius:9px;background:rgba(255,255,255,.18);overflow:hidden}
+.igorbar i{position:absolute;inset:0 0 0 auto;width:0;background:linear-gradient(270deg,#ff7a1a,#ffe14a);transition:width .6s}
+.igorbar em{position:relative;font-style:normal;font-weight:700;font-size:12px;line-height:18px;direction:ltr;display:block}
+.plus1{position:absolute;top:-6px;left:50%;font-family:var(--display);font-weight:800;font-size:34px;color:#ffd23f;text-shadow:0 2px 0 #2a1208,0 0 14px rgba(255,180,40,.9);direction:ltr;pointer-events:none;animation:plus1 1.4s ease-out forwards}
+@keyframes plus1{0%{transform:translate(-50%,40px) scale(.4);opacity:0}25%{transform:translate(-50%,0) scale(1.2);opacity:1}100%{transform:translate(-50%,30px) scale(.2);opacity:0}}
+.igorflash{position:fixed;inset:0;background:#fff3dc;opacity:0;pointer-events:none;z-index:50}
+.igorflash.on{animation:igorflash .9s ease-out}
+@keyframes igorflash{0%{opacity:1}100%{opacity:0}}
+body.film .igorhud{display:none!important}
+@media (prefers-reduced-motion:reduce){.igorflash.on,.plus1{animation:none}}
 body.film .pad,body.film .top .note,body.film .bar,body.film .sheet,body.film .welcome{display:none!important}
 .filmhint{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:50%;transform:translateX(-50%);font-size:13px;color:rgba(42,29,23,.55)}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
@@ -104,6 +117,7 @@ body.film .pad,body.film .top .note,body.film .bar,body.film .sheet,body.film .w
   <div class="party" id="partyBanner" hidden></div>
   <button class="cd" id="countdown" type="button" hidden></button>
   <div class="note" id="note" hidden></div>
+  <div class="igorhud" id="igorHud" hidden><b>איגור הבבון תוקף! הגיבור צריך 200 תושבים</b><div class="igorbar"><i id="igorFill"></i><em id="igorCount">0 / 200</em></div></div>
 </div>
 
 <div class="bar" id="bar">
@@ -166,6 +180,7 @@ body.film .pad,body.film .top .note,body.film .bar,body.film .sheet,body.film .w
     <button class="linkbtn" id="skipWelcome" type="button">רק להסתכל</button>
   </form>
 </div>
+<div class="igorflash" id="igorFlash" aria-hidden="true"></div>
 <div class="filmhint" id="filmhint" hidden>לחיצה על המסך יוצאת ממצב צילום</div>
 
 <script src="vendor/three.min.js"></script>
@@ -782,10 +797,12 @@ function maybeWelcome(){return;
 
 let knownIds=new Set();
 function onResidents(list,announce){
+  if(announce&&typeof igorPlusOne==="function"){const fresh=list.filter(r=>!knownIds.has(r.id)).length;for(let i=0;i<Math.min(fresh,5);i++)setTimeout(igorPlusOne,i*250)}
   const newIds=new Set();list.forEach(r=>{if(!knownIds.has(r.id))newIds.add(r.id)});
   knownIds=new Set(list.map(r=>r.id));
   residents=list;
   render(announce?newIds:null);
+  if(igor.state!=="wait")igorHud();
   if(announce&&newIds.size){const last=list.filter(r=>newIds.has(r.id)).pop();flyToSlot(list.indexOf(last),last.id===myId);toast(last.id===myId?'ברוכים הבאים הביתה, '+last.name+'!':'ברוכים הבאים, '+last.name+'!',last.id===myId?'זה הבית שלך בשקשוקה סיטי':'תושב חדש בשקשוקה סיטי')}
 }
 
@@ -981,6 +998,98 @@ async function connect(){goStatic();await cloudRefresh();setInterval(cloudRefres
   },err=>{clearTimeout(timer);goGuest()});
 }
 
+// ===== Day 4: Igor the baboon attacks (lands from the sky, the city burns, police + helicopters) =====
+const IGOR_POS=new THREE.Vector3(28,0,-28);
+const igor={state:'wait',t0:0,parts:[],fires:[],helis:[],cops:[],ready:false};
+{
+  const tex=(w,h,fn)=>{const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);return new THREE.CanvasTexture(c)};
+  igor.fireTex=tex(128,192,(x,w,h)=>{const g=x.createRadialGradient(w/2,h*.66,4,w/2,h*.62,w*.5);g.addColorStop(0,'rgba(255,255,220,1)');g.addColorStop(.25,'rgba(255,220,90,.95)');g.addColorStop(.55,'rgba(255,110,20,.75)');g.addColorStop(1,'rgba(200,30,0,0)');x.fillStyle=g;x.beginPath();x.moveTo(w/2,0);x.bezierCurveTo(w*.95,h*.45,w*.98,h*.95,w/2,h);x.bezierCurveTo(w*.02,h*.95,w*.05,h*.45,w/2,0);x.fill()});
+  igor.glowTex=tex(128,128,(x)=>{const g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.3,'rgba(255,255,255,.5)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,128,128)});
+  igor.smokeTex=tex(128,128,(x)=>{const r=rng(7);for(let i=0;i<9;i++){const cx=40+r()*48,cy=40+r()*48,rr=22+r()*22;const g=x.createRadialGradient(cx,cy,0,cx,cy,rr);g.addColorStop(0,'rgba(60,50,55,.55)');g.addColorStop(1,'rgba(60,50,55,0)');x.fillStyle=g;x.fillRect(0,0,128,128)}});
+  const spr=(t,add=true,op=1,col=0xffffff)=>new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,opacity:op,color:col,fog:false,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));
+  igor.spr=spr;
+  const img=new Image();
+  img.onload=()=>{
+    const t=new THREE.Texture(img);t.needsUpdate=true;if('colorSpace' in t&&THREE.SRGBColorSpace)t.colorSpace=THREE.SRGBColorSpace;
+    const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,fog:false,alphaTest:.4}));
+    s.center.set(.5,0);igor.h=46;igor.w=46*img.width/img.height;s.scale.set(igor.w,igor.h,1);s.visible=false;scene.add(s);igor.sprite=s;igor.ready=true;
+  };
+  img.src='igor.png';
+  igor.ball=spr(igor.glowTex,true,0,0xff7a20);scene.add(igor.ball);
+  igor.light=new THREE.PointLight(0xff8a30,0,240,1.4);igor.light.position.set(IGOR_POS.x,18,IGOR_POS.z);scene.add(igor.light);
+  igor.wave=new THREE.Mesh(new THREE.RingGeometry(.85,1,96),new THREE.MeshBasicMaterial({color:0xffb040,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  igor.wave.rotation.x=-Math.PI/2;igor.wave.position.set(IGOR_POS.x,.6,IGOR_POS.z);scene.add(igor.wave);
+  // fires around Igor (the houses nearest to him, plus a ring at his feet)
+  const r=rng(99);
+  const near=slots.map((s,i)=>({s,d:Math.hypot(s.x-IGOR_POS.x,s.z-IGOR_POS.z)})).filter(o=>o.d<70);
+  near.forEach(({s,d})=>{if(r()>.55)return;for(let j=0;j<2;j++){const sp=spr(igor.fireTex,true,0);sp.center.set(.5,0);sp.position.set(s.x+(r()-.5)*4,.3,s.z+(r()-.5)*4);scene.add(sp);igor.fires.push({sp,sz:3+r()*4,ign:.1+d/85+r()*.3,ph:r()*6.28,f:6+r()*6})}
+    if(r()<.35)for(let j=0;j<4;j++){const sm=spr(igor.smokeTex,false,0);scene.add(sm);igor.fires.push({smoke:true,sp:sm,x:s.x,z:s.z,ign:.3+d/85,off:j/4,sz:10+r()*8})}});
+  for(let k=0;k<14;k++){const sp=spr(igor.fireTex,true,0);sp.center.set(.5,0);const a=r()*6.28,rr=6+r()*12;sp.position.set(IGOR_POS.x+Math.cos(a)*rr,.3,IGOR_POS.z+Math.sin(a)*rr);scene.add(sp);igor.fires.push({sp,sz:7+r()*7,ign:0,ph:r()*6.28,f:7})}
+  // helicopters
+  const Mt=(c,e)=>new THREE.MeshStandardMaterial({color:c,flatShading:true,emissive:e||0});
+  for(let i=0;i<3;i++){const g=new THREE.Group();
+    const body=new THREE.Mesh(new THREE.SphereGeometry(2.4,14,10),Mt(0x1d2f6b));body.scale.set(1.6,1,1);g.add(body);
+    const glass=new THREE.Mesh(new THREE.SphereGeometry(1.5,12,8),Mt(0x9fd6ff,0x203040));glass.position.set(2.4,.5,0);g.add(glass);
+    const tail=new THREE.Mesh(new THREE.BoxGeometry(7,.7,.7),Mt(0x1d2f6b));tail.position.set(-6,.6,0);g.add(tail);
+    const fin=new THREE.Mesh(new THREE.BoxGeometry(1.2,2.4,.3),Mt(0xf2f2f2));fin.position.set(-9.2,1.6,0);g.add(fin);
+    const rotor=new THREE.Mesh(new THREE.BoxGeometry(16,.15,.7),Mt(0x222222));rotor.position.y=2.6;g.add(rotor);const r2=rotor.clone();r2.rotation.y=Math.PI/2;r2.position.set(0,0,0);rotor.add(r2);
+    [-1,1].forEach(s=>{const sk=new THREE.Mesh(new THREE.BoxGeometry(5,.25,.25),Mt(0x333333));sk.position.set(0,-2.4,s*1.6);g.add(sk)});
+    const red=spr(igor.glowTex,true,1,0xff2a2a);red.scale.set(3,3,3);red.position.set(-1,2.2,0);g.add(red);
+    const blue=spr(igor.glowTex,true,1,0x3a6aff);blue.scale.set(3,3,3);blue.position.set(1,2.2,0);g.add(blue);
+    const beam=new THREE.Mesh(new THREE.ConeGeometry(9,40,24,1,true),new THREE.MeshBasicMaterial({color:0xfff3c0,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));beam.position.y=-20;g.add(beam);
+    g.scale.setScalar(1.25);g.visible=false;scene.add(g);igor.helis.push({g,rotor,red,blue,i})}
+  // police cars parked around him, lights flashing
+  [[-1,0],[1,0],[0,-1],[0,1],[-1,0],[0,1]].forEach(([dx,dz],i)=>{const g=new THREE.Group();
+    const b=new THREE.Mesh(new THREE.BoxGeometry(5.2,1.4,2.6),Mt(0xf4f4f4));b.position.y=1.1;g.add(b);
+    const st=new THREE.Mesh(new THREE.BoxGeometry(5.25,.45,2.65),Mt(0x1d3fa8));st.position.y=1;g.add(st);
+    const cab=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.1,2.3),Mt(0x1a2440,0x101830));cab.position.set(-.2,2.3,0);g.add(cab);
+    [[-1.7,1.3],[1.7,1.3],[-1.7,-1.3],[1.7,-1.3]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.4,12),Mt(0x111111));w.rotation.x=Math.PI/2;w.position.set(x,.55,z);g.add(w)});
+    const hr=spr(igor.glowTex,true,1,0xff2020);hr.scale.set(7,7,7);hr.position.set(-.2,3.2,.55);g.add(hr);
+    const hb=spr(igor.glowTex,true,1,0x3050ff);hb.scale.set(7,7,7);hb.position.set(-.2,3.2,-.55);g.add(hb);
+    const d=22+(i>3?8:0);g.position.set(IGOR_POS.x-dx*d+(i>3?3:0),0,IGOR_POS.z-dz*d+(i>3?-3:0));g.rotation.y=dx?(dx>0?0:Math.PI):(dz>0?-Math.PI/2:Math.PI/2);
+    g.scale.setScalar(1.3);g.visible=false;scene.add(g);igor.cops.push({g,hr,hb,i})});
+}
+function igorFlash(){const f=$('igorFlash');if(!f)return;f.classList.remove('on');void f.offsetWidth;f.classList.add('on')}
+function igorHud(){const n=Math.min(residents.length,200);$('igorCount').textContent=n+' / 200';$('igorFill').style.width=(n/200*100)+'%'}
+function igorPlusOne(){const p=document.createElement('div');p.className='plus1';p.textContent='+1';$('igorHud').appendChild(p);setTimeout(()=>p.remove(),1400);igorHud()}
+function igorTick(t,dt){
+  if(!igor.ready)return;
+  const now=t;
+  if(igor.state==='wait'){if(!initialLoaded)return;igor.state=reduce?'landed':'fall';igor.t0=now;igor.sprite.visible=true;$('igorHud').hidden=false;igorHud();
+    if(!reduce&&!ptrs.size)fly={t0:performance.now(),dur:2200,from:cam.target.clone(),to:new THREE.Vector3(IGOR_POS.x-10,26,IGOR_POS.z),r0:cam.radius,r1:135,p0:cam.phi,p1:1.12,th0:cam.theta,th1:2.7}}
+  const k=now-igor.t0,FALL=2.4;
+  // darken the sky while he falls, then go back to the city's own look
+  const th=THEMES[settings.theme]||THEMES.day;
+  const dark=igor.state==='fall'?Math.min(1,k/1.5):Math.max(0,1-(k-FALL)/3);
+  if(dark>0){const c=new THREE.Color(th.sky).lerp(new THREE.Color(0x2b1530),dark*.9);scene.background.copy(c);scene.fog.color.copy(c)}
+  else if(igor.state==='landed'&&!igor.restored){scene.background.setHex(th.sky);scene.fog.color.setHex(th.sky);igor.restored=true}
+  if(igor.state==='fall'){
+    const fk=Math.min(1,k/FALL),e=fk*fk*fk,y=170*(1-e);
+    igor.sprite.position.set(IGOR_POS.x-60*(1-e),y,IGOR_POS.z-40*(1-e));igor.sprite.material.rotation=Math.sin(now*9)*.08*(1-fk);
+    igor.ball.position.set(igor.sprite.position.x,y+igor.h*.5,igor.sprite.position.z);igor.ball.material.opacity=.95;const s=70+Math.sin(now*40)*6;igor.ball.scale.set(s,s,s);
+    for(let j=0;j<2;j++){const sp=igor.spr(j?igor.fireTex:igor.smokeTex,!!j,1);sp.position.set(igor.sprite.position.x+(Math.random()-.5)*10,y+10+Math.random()*20,igor.sprite.position.z+(Math.random()-.5)*10);scene.add(sp);igor.parts.push({sp,life:0,max:j?.5:1.6,s0:j?18:22,g:j?-20:30,vy:j?10:4})}
+    if(fk>=1){igor.state='landed';igor.t0=now-FALL;igorFlash();igor.boomAt=now}
+  }
+  if(igor.state==='landed'){
+    const lt=now-(igor.boomAt??now-10);
+    const sq=lt<.35?1-Math.sin(lt/.35*Math.PI)*.18:1,br=1+Math.sin(now*2.4)*.012;
+    igor.sprite.position.copy(IGOR_POS);igor.sprite.material.rotation=0;igor.sprite.scale.set(igor.w*(2-sq)*br,igor.h*sq*br,1);
+    igor.ball.material.opacity=Math.max(0,1-lt/.25)*.95;
+    igor.wave.material.opacity=Math.max(0,1-lt/1.3);igor.wave.scale.setScalar(4+Math.min(1,lt/1.3)*170);
+    igor.light.intensity=8*Math.exp(-lt*1.6)+1.4+Math.sin(now*9)*.2;
+    // shake the camera for a moment
+    if(lt<1.5&&!reduce){const a=4*Math.exp(-lt*2.6);camera.position.x+=(Math.random()-.5)*a;camera.position.y+=(Math.random()-.5)*a;camera.lookAt(cam.target)}
+    igor.fires.forEach(f=>{const fk=lt-f.ign;if(fk<0){f.sp.material.opacity=0;return}
+      if(f.smoke){const c=((fk*.25+f.off)%1);f.sp.position.set(f.x+c*6,6+c*40,f.z-c*4);const s=f.sz*(.6+c*1.6);f.sp.scale.set(s,s,s);f.sp.material.opacity=.7*Math.sin(c*Math.PI)*Math.min(1,fk/.5);return}
+      const fl=1+Math.sin(now*f.f+f.ph)*.18+Math.sin(now*f.f*2.3+f.ph)*.08,g=Math.min(1,fk/.5);f.sp.scale.set(f.sz*.65*fl*g,f.sz*fl*g*1.15,1);f.sp.material.opacity=.95});
+    igor.helis.forEach(h=>{const st=lt-1.5-h.i*.35;h.g.visible=st>0;if(st<=0)return;const ap=Math.min(1,st/2.2),ease=1-Math.pow(1-ap,3);
+      const ang=h.i*2.1+st*.45,rad=160+(34+h.i*7-160)*ease;h.g.position.set(IGOR_POS.x+Math.cos(ang)*rad,34+h.i*6+Math.sin(st*1.3+h.i)*1.5,IGOR_POS.z+Math.sin(ang)*rad);
+      h.g.rotation.set(0,-ang-Math.PI/2+.25,.18);h.rotor.rotation.y=now*38;const b=Math.floor(now*4+h.i)%2;h.red.material.opacity=b?1:.15;h.blue.material.opacity=b?.15:1});
+    igor.cops.forEach(c=>{c.g.visible=lt>2.5;const b=Math.floor(now*6+c.i)%2;c.hr.material.opacity=b?1:.1;c.hb.material.opacity=b?.1:1});
+  }
+  for(let i=igor.parts.length-1;i>=0;i--){const p=igor.parts[i];p.life+=dt;const q=p.life/p.max;if(q>=1){scene.remove(p.sp);p.sp.material.dispose();igor.parts.splice(i,1);continue}p.sp.position.y+=p.vy*dt;const s=Math.max(1,p.s0+p.g*q);p.sp.scale.set(s,s,s);p.sp.material.opacity=(1-q)*.9}
+}
+
 // ===== Camera (orbit: drag to turn, pinch or wheel to zoom) =====
 const cam={target:new THREE.Vector3(0,8,0),theta:.65,phi:.92,radius:110};
 let fly=null;
@@ -1029,6 +1138,7 @@ function loop(){
   camera.lookAt(cam.target);
 
   if(!reduce)anim.forEach(f=>f(t));
+  igorTick(t,dt);
   if(!reduce)partyTick(t,dt);
   revealTick(t,dt);
   // pops
